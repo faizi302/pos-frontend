@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/* =====================================================
+   THEME TOKEN SYSTEM
+   Semantic tokens so components never hardcode colors.
+   A business theme just needs to redefine these variables.
+===================================================== */
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-surface: var(--ui-primary);
+  --color-surface-card: var(--ui-secondary);
+
+  --color-brand: var(--action-primary);
+  --color-brand-hover: var(--action-primary-hover);
+  --color-muted-action: var(--action-secondary);
+  --color-muted-action-hover: var(--action-secondary-hover);
+
+  --color-border: var(--border-primary-color);
+  --color-border-soft: var(--border-secondary-color);
+}
+
+:root {
+  --ui-primary: #f4f5f7;
+  --ui-secondary: #ffffff;
+
+  --text-primary-color: #111827;
+  --text-secondary-color: #6b7280;
+
+  --action-primary: #4f46e5;
+  --action-primary-hover: #4338ca;
+
+  --action-secondary: #e5e7eb;
+  --action-secondary-hover: #d1d5db;
+
+  --border-primary-color: #d1d5db;
+  --border-secondary-color: #e5e7eb;
+
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+  --color-warning: #d97706;
+  --color-info: #2563eb;
+}
+
+.dark {
+  --ui-primary: #0b0f19;
+  --ui-secondary: #141a29;
+
+  --text-primary-color: #f9fafb;
+  --text-secondary-color: #9ca3af;
+
+  --action-primary: #6366f1;
+  --action-primary-hover: #818cf8;
+
+  --action-secondary: #1f2937;
+  --action-secondary-hover: #2b3446;
+
+  --border-primary-color: #26304199;
+  --border-secondary-color: #1f2937;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--ui-primary);
+  color: var(--text-primary-color);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.text-primary {
+  color: var(--text-primary-color);
+}
+.text-secondary {
+  color: var(--text-secondary-color);
+}
+.bg-surface {
+  background-color: var(--ui-primary);
+}
+.bg-card {
+  background-color: var(--ui-secondary);
+}
+.border-primary {
+  border-color: var(--border-primary-color);
+}
+.border-secondary {
+  border-color: var(--border-secondary-color);
+}
+
+/* thin, unobtrusive scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-primary-color) transparent;
+}
+
+/* simple fade/slide utility used across cards & pages */
+@keyframes fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-slide-up 0.35s ease-out both;
+}
