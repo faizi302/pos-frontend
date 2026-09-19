@@ -203,7 +203,7 @@ export const sidebarConfig = [
     icon: Receipt,
     section: "Sales",
     roles: ["admin", "manager"],
-    comingSoon: true,
+    comingSoon: false,
   },
 
   {
@@ -212,7 +212,7 @@ export const sidebarConfig = [
     icon: List,
     section: "Sales",
     roles: ["admin", "manager"],
-    comingSoon: true,
+    comingSoon: false,
   },
 
   {
@@ -221,7 +221,7 @@ export const sidebarConfig = [
     icon: CreditCard,
     section: "Sales",
     roles: ["admin", "manager"],
-    comingSoon: true,
+    comingSoon: false,
   },
 
   {
@@ -243,7 +243,7 @@ export const sidebarConfig = [
     icon: UsersRound,
     section: "Customers",
     roles: ["admin", "manager"],
-    comingSoon: true,
+    comingSoon: false,
   },
 
   // =====================================================
@@ -274,7 +274,7 @@ export const sidebarConfig = [
     icon: Landmark,
     section: "Finance",
     roles: ["admin", "manager"],
-    comingSoon: true,
+    comingSoon: false,
   },
 
   {

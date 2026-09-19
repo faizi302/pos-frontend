@@ -8,8 +8,6 @@ export const API_BASE_URL =
 export const API_ROUTES = {
   // Users
   users: "/users",
-
-  // Dedicated Manager routes
   managers: "/users/managers",
 
   // Permissions & Roles
@@ -19,14 +17,24 @@ export const API_ROUTES = {
   // Business hierarchy
   business: "/business",
   businessType: "/business-type",
-
   brands: "/brand",
   models: "/model",
   categories: "/Prod-cat",
 
   // Products
   products: "/products",
-
-  // Product Inventory
   productInventory: "/products-Inventory",
+
+  // Customers
+  customers: "/customers",
+
+  // Cash Register
+  cashRegisters: "/cash-register",
+
+  // Sales
+  sales: "/sale",
+  saleItems: "/sale-item",
+  salePayments: "/sale-payment",
+
+   payments: "/payment",
 };
