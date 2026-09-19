@@ -1,5 +1,4 @@
-import { useEffect,useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import {
@@ -27,42 +26,27 @@ import {
   useDeleteProductInventoryMutation,
 } from "../../features/products/productInventoryApi";
 
-import {
-  useGetProductsQuery,
-} from "../../features/products/productApi";
+import { useGetProductsQuery } from "../../features/products/productApi";
 
 // ======================================================
 // HELPERS
 // ======================================================
 
-const getProductName = (product) => {
-  if (!product) return "Unknown Product";
-
-  return product.name || "Unknown Product";
-};
-
-const getProductSku = (product) => {
-  return product?.sku || "-";
-};
+const getProductName = (product) => product?.name || "Unknown Product";
+const getProductSku = (product) => product?.sku || "—";
 
 const getProductBrand = (product) => {
-  if (!product?.brand) return "-";
-
-  if (typeof product.brand === "object") {
-    return product.brand.name || "-";
-  }
-
-  return product.brand;
+  if (!product?.brand) return "—";
+  return typeof product.brand === "object"
+    ? product.brand.name || "—"
+    : product.brand;
 };
 
 const getProductModel = (product) => {
-  if (!product?.model) return "-";
-
-  if (typeof product.model === "object") {
-    return product.model.name || "-";
-  }
-
-  return product.model;
+  if (!product?.model) return "—";
+  return typeof product.model === "object"
+    ? product.model.name || "—"
+    : product.model;
 };
 
 const getStockStatus = (item) => {
@@ -73,7 +57,7 @@ const getStockStatus = (item) => {
     return {
       label: "Out of Stock",
       className:
-        "border-red-500/20 bg-red-500/10 text-red-500",
+        "border-[var(--color-danger)]/20 bg-[var(--color-danger)]/10 text-[var(--color-danger)]",
       icon: XCircle,
     };
   }
@@ -82,7 +66,7 @@ const getStockStatus = (item) => {
     return {
       label: "Low Stock",
       className:
-        "border-yellow-500/20 bg-yellow-500/10 text-yellow-500",
+        "border-[var(--color-warning)]/20 bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
       icon: AlertTriangle,
     };
   }
@@ -90,17 +74,19 @@ const getStockStatus = (item) => {
   return {
     label: "In Stock",
     className:
-      "border-green-500/20 bg-green-500/10 text-green-500",
+      "border-[var(--color-success)]/20 bg-[var(--color-success)]/10 text-[var(--color-success)]",
     icon: CheckCircle,
   };
 };
+
+const formatMoney = (value) =>
+  Number(value || 0).toLocaleString("en-PK");
 
 // ======================================================
 // MAIN COMPONENT
 // ======================================================
 
 export default function ProductInventory() {
-      const user = useSelector((state) => state.auth.user);
   const [search, setSearch] = useState("");
   const [stockStatus, setStockStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -108,10 +94,6 @@ export default function ProductInventory() {
   const [showForm, setShowForm] = useState(false);
   const [editingInventory, setEditingInventory] = useState(null);
   const [selectedInventory, setSelectedInventory] = useState(null);
-
-  // ====================================================
-  // GET INVENTORY
-  // ====================================================
 
   const {
     data: inventoryResponse,
@@ -121,25 +103,16 @@ export default function ProductInventory() {
   } = useGetProductInventoryQuery({
     page,
     limit: 20,
-    search,
-    stockStatus,
+    search: search.trim() || undefined,
+    stockStatus: stockStatus || undefined,
   });
 
-  // ====================================================
-  // GET PRODUCTS
-  // ====================================================
-
-  const {
-    data: productResponse,
-    isLoading: productsLoading,
-  } = useGetProductsQuery({
-    page: 1,
-    limit: 100,
-  });
-
-  // ====================================================
-  // MUTATIONS
-  // ====================================================
+  const { data: productResponse, isLoading: productsLoading } =
+    useGetProductsQuery({
+      page: 1,
+      limit: 100,
+      isActive: true,
+    });
 
   const [createProductInventory, { isLoading: isCreating }] =
     useCreateProductInventoryMutation();
@@ -150,181 +123,85 @@ export default function ProductInventory() {
   const [deleteProductInventory, { isLoading: isDeleting }] =
     useDeleteProductInventoryMutation();
 
-  // ====================================================
-  // RESPONSE DATA
-  // ====================================================
-
-  const inventory =
-    inventoryResponse?.data?.inventory ||
-    inventoryResponse?.inventory ||
-    [];
-
-    // ====================================================
-// DEBUG TENANT ISOLATION
-// ====================================================
-
-useEffect(() => {
-  console.group(
-    "========== PRODUCT INVENTORY ISOLATION DEBUG =========="
-  );
-
-  console.log("LOGGED-IN USER:", user);
-
-  console.log("USER ID:", user?._id);
-
-  console.log("USER NAME:", user?.name);
-
-  console.log("USER EMAIL:", user?.email);
-
-  console.log("USER ROLE:", user?.role);
-
-  console.log("USER BUSINESS:", user?.business);
-
-  console.log(
-    "USER BUSINESS TYPE:",
-    user?.businessType
-  );
-
-  console.log(
-    "USER CREATED BY:",
-    user?.createdBy
-  );
-
-  console.log(
-    "INVENTORY API RESPONSE:",
-    inventoryResponse
-  );
-
-  console.log(
-    "TOTAL INVENTORIES:",
-    inventory.length
-  );
-
-  console.log(
-    "ALL INVENTORIES:",
-    inventory
-  );
-
-  inventory.forEach((item, index) => {
-    console.group(
-      `Inventory ${index + 1}`
-    );
-
-    console.log(
-      "Inventory ID:",
-      item?._id
-    );
-
-    console.log(
-      "Inventory Business:",
-      item?.business
-    );
-
-    console.log(
-      "Product ID:",
-      item?.product?._id
-    );
-
-    console.log(
-      "Product Name:",
-      item?.product?.name
-    );
-
-    console.log(
-      "Product SKU:",
-      item?.product?.sku
-    );
-
-    console.log(
-      "Product Business:",
-      item?.product?.business
-    );
-
-    console.log(
-      "Product Business Type:",
-      item?.product?.businessType
-    );
-
-    console.log(
-      "Inventory Created By:",
-      item?.createdBy
-    );
-
-    console.log(
-      "Inventory Quantity:",
-      item?.quantity
-    );
-
-    console.groupEnd();
-  });
-
-  console.groupEnd();
-}, [user, inventoryResponse, inventory]);
+  // API shape: { success, message, data: { inventory, pagination } }
+  const inventory = useMemo(() => {
+    if (Array.isArray(inventoryResponse?.data?.inventory)) {
+      return inventoryResponse.data.inventory;
+    }
+    if (Array.isArray(inventoryResponse?.inventory)) {
+      return inventoryResponse.inventory;
+    }
+    if (Array.isArray(inventoryResponse?.data)) {
+      return inventoryResponse.data;
+    }
+    if (Array.isArray(inventoryResponse)) {
+      return inventoryResponse;
+    }
+    return [];
+  }, [inventoryResponse]);
 
   const pagination =
     inventoryResponse?.data?.pagination ||
-    inventoryResponse?.pagination ||
-    {
+    inventoryResponse?.pagination || {
       page: 1,
       limit: 20,
       total: 0,
       totalPages: 0,
     };
 
-  const products =
-    productResponse?.data?.products ||
-    productResponse?.products ||
-    [];
-
-  // ====================================================
-  // SEARCH
-  // ====================================================
+  const products = useMemo(() => {
+    if (Array.isArray(productResponse?.data?.products)) {
+      return productResponse.data.products;
+    }
+    if (Array.isArray(productResponse?.products)) {
+      return productResponse.products;
+    }
+    if (Array.isArray(productResponse?.data)) {
+      return productResponse.data;
+    }
+    if (Array.isArray(productResponse)) {
+      return productResponse;
+    }
+    return [];
+  }, [productResponse]);
 
   const filteredInventory = useMemo(() => {
-    if (!search.trim()) {
-      return inventory;
-    }
+    if (!search.trim()) return inventory;
 
     const value = search.toLowerCase().trim();
 
     return inventory.filter((item) => {
       const product = item.product;
-
       return (
-        getProductName(product)
-          .toLowerCase()
-          .includes(value) ||
-        getProductSku(product)
-          .toLowerCase()
-          .includes(value) ||
-        getProductBrand(product)
-          .toLowerCase()
-          .includes(value) ||
-        getProductModel(product)
-          .toLowerCase()
-          .includes(value) ||
-        String(item.color || "")
-          .toLowerCase()
-          .includes(value) ||
-        String(item.size || "")
-          .toLowerCase()
-          .includes(value)
+        getProductName(product).toLowerCase().includes(value) ||
+        getProductSku(product).toLowerCase().includes(value) ||
+        getProductBrand(product).toLowerCase().includes(value) ||
+        getProductModel(product).toLowerCase().includes(value) ||
+        String(item.color || "").toLowerCase().includes(value) ||
+        String(item.size || "").toLowerCase().includes(value)
       );
     });
   }, [inventory, search]);
 
-  // ====================================================
-  // OPEN CREATE FORM
-  // ====================================================
+  const inStockCount = inventory.filter(
+    (item) => Number(item.quantity || 0) > Number(item.minStock || 0)
+  ).length;
+
+  const lowStockCount = inventory.filter(
+    (item) =>
+      Number(item.quantity || 0) > 0 &&
+      Number(item.quantity || 0) <= Number(item.minStock || 0)
+  ).length;
+
+  const outOfStockCount = inventory.filter(
+    (item) => Number(item.quantity || 0) === 0
+  ).length;
 
   const handleCreate = () => {
     setEditingInventory(null);
+    setSelectedInventory(null);
     setShowForm(true);
   };
-
-  // ====================================================
-  // OPEN EDIT FORM
-  // ====================================================
 
   const handleEdit = (item) => {
     setSelectedInventory(null);
@@ -332,18 +209,10 @@ useEffect(() => {
     setShowForm(true);
   };
 
-  // ====================================================
-  // CLOSE FORM
-  // ====================================================
-
   const handleCloseForm = () => {
     setShowForm(false);
     setEditingInventory(null);
   };
-
-  // ====================================================
-  // SUBMIT
-  // ====================================================
 
   const handleSubmit = async (formData) => {
     try {
@@ -352,160 +221,86 @@ useEffect(() => {
           id: editingInventory._id,
           ...formData,
           product:
-            editingInventory.product?._id ||
-            editingInventory.product,
+            editingInventory.product?._id || editingInventory.product,
         }).unwrap();
-
-        toast.success(
-          "Product inventory updated successfully."
-        );
+        toast.success("Product inventory updated successfully.");
       } else {
         await createProductInventory(formData).unwrap();
-
-        toast.success(
-          "Product inventory created successfully."
-        );
+        toast.success("Product inventory created successfully.");
       }
-
       handleCloseForm();
     } catch (error) {
-      toast.error(
-        error?.data?.message ||
-          "Something went wrong."
-      );
+      toast.error(error?.data?.message || "Something went wrong.");
     }
   };
-
-  // ====================================================
-  // DELETE
-  // ====================================================
 
   const handleDelete = async (id) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this inventory?"
     );
-
     if (!confirmed) return;
 
     try {
       await deleteProductInventory(id).unwrap();
-
-      if (selectedInventory?._id === id) {
-        setSelectedInventory(null);
-      }
-
-      toast.success(
-        "Product inventory deleted successfully."
-      );
+      if (selectedInventory?._id === id) setSelectedInventory(null);
+      toast.success("Product inventory deleted successfully.");
     } catch (error) {
-      toast.error(
-        error?.data?.message ||
-          "Failed to delete inventory."
-      );
+      toast.error(error?.data?.message || "Failed to delete inventory.");
     }
   };
 
-  // ====================================================
-  // PAGE CHANGE
-  // ====================================================
-
   const handlePageChange = (newPage) => {
-    if (
-      newPage < 1 ||
-      newPage > pagination.totalPages
-    ) {
-      return;
-    }
-
+    if (newPage < 1 || newPage > (pagination.totalPages || 1)) return;
     setPage(newPage);
   };
 
-  // ====================================================
-  // RENDER
-  // ====================================================
-
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="animate-fade-up min-w-0 space-y-6">
+      {/* HEADER + ADD BUTTON (always visible) */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader
+          title="Product Inventory"
+          description="Manage product stock, variants, pricing and inventory levels."
+        />
 
-      {/* ==================================================
-          HEADER
-      ================================================== */}
-
-      <PageHeader
-        title="Product Inventory"
-        description="Manage product stock, variants, pricing and inventory levels."
-      >
         <Button
           type="button"
           onClick={handleCreate}
-          className="w-full gap-2 sm:w-auto"
+          className="inline-flex w-full shrink-0 items-center justify-center gap-2 sm:w-auto"
         >
           <Plus size={18} />
           Add Inventory
         </Button>
-      </PageHeader>
+      </div>
 
-      {/* ==================================================
-          SUMMARY CARDS
-      ================================================== */}
-
+      {/* SUMMARY */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Total Inventory"
-          value={pagination.total}
+          value={pagination.total || inventory.length}
           icon={Boxes}
         />
-
-        <SummaryCard
-          title="In Stock"
-          value={
-            inventory.filter(
-              (item) =>
-                Number(item.quantity || 0) >
-                Number(item.minStock || 0)
-            ).length
-          }
-          icon={CheckCircle}
-        />
-
+        <SummaryCard title="In Stock" value={inStockCount} icon={CheckCircle} />
         <SummaryCard
           title="Low Stock"
-          value={
-            inventory.filter(
-              (item) =>
-                Number(item.quantity || 0) > 0 &&
-                Number(item.quantity || 0) <=
-                  Number(item.minStock || 0)
-            ).length
-          }
+          value={lowStockCount}
           icon={AlertTriangle}
         />
-
         <SummaryCard
           title="Out of Stock"
-          value={
-            inventory.filter(
-              (item) =>
-                Number(item.quantity || 0) === 0
-            ).length
-          }
+          value={outOfStockCount}
           icon={XCircle}
         />
       </div>
 
-      {/* ==================================================
-          FILTERS
-      ================================================== */}
-
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      {/* FILTERS */}
+      <div className="rounded-2xl border border-primary bg-card p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
           <div className="relative w-full lg:max-w-md">
             <Search
               size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary"
             />
-
             <input
               type="text"
               value={search}
@@ -514,7 +309,7 @@ useEffect(() => {
                 setPage(1);
               }}
               placeholder="Search product, SKU, brand..."
-              className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-sm outline-none transition focus:border-primary"
+              className="h-11 w-full rounded-xl border border-primary bg-surface pl-10 pr-4 text-sm text-primary outline-none transition focus:border-brand"
             />
           </div>
 
@@ -525,109 +320,81 @@ useEffect(() => {
                 setStockStatus(e.target.value);
                 setPage(1);
               }}
-              className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none focus:border-primary sm:min-w-[150px]"
+              className="h-11 w-full rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none focus:border-brand sm:min-w-[150px]"
             >
               <option value="">All Stock</option>
               <option value="in-stock">In Stock</option>
               <option value="low-stock">Low Stock</option>
-              <option value="out-of-stock">
-                Out of Stock
-              </option>
+              <option value="out-of-stock">Out of Stock</option>
             </select>
 
             <button
               type="button"
               onClick={() => refetch()}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-medium transition hover:bg-muted lg:w-auto"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary bg-surface px-4 text-sm font-medium text-primary transition hover:bg-muted-action lg:w-auto"
             >
               <RefreshCw
                 size={17}
-                className={
-                  isFetching
-                    ? "animate-spin"
-                    : ""
-                }
+                className={isFetching ? "animate-spin" : ""}
               />
-
               Refresh
             </button>
           </div>
         </div>
       </div>
 
-      {/* ==================================================
-          TABLE
-      ================================================== */}
-
-      <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-
+      {/* TABLE */}
+      <div className="min-w-0 overflow-hidden rounded-2xl border border-primary bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1050px] text-sm">
-
-            <thead className="border-b border-border bg-muted/40">
+            <thead className="border-b border-secondary bg-surface">
               <tr>
-                <th className="px-5 py-4 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold text-primary">
                   Product
                 </th>
-
-                <th className="px-5 py-4 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold text-primary">
                   SKU
                 </th>
-
-                <th className="px-5 py-4 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold text-primary">
                   Variant
                 </th>
-
-                <th className="px-5 py-4 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold text-primary">
                   Quantity
                 </th>
-
-                <th className="px-5 py-4 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold text-primary">
                   Purchase
                 </th>
-
-                <th className="px-5 py-4 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold text-primary">
                   Sale
                 </th>
-
-                <th className="px-5 py-4 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold text-primary">
                   Status
                 </th>
-
-                <th className="px-5 py-4 text-right font-semibold">
+                <th className="px-5 py-4 text-right font-semibold text-primary">
                   Actions
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-border">
-
+            <tbody className="divide-y divide-[var(--border-secondary-color)]">
               {isLoading ? (
                 <InventorySkeleton />
               ) : filteredInventory.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-5 py-16 text-center"
-                  >
+                  <td colSpan={8} className="px-5 py-16 text-center">
                     <div className="flex flex-col items-center justify-center">
-                      <Package
-                        size={42}
-                        className="mb-3 text-muted-foreground"
-                      />
-
-                      <h3 className="text-base font-semibold">
+                      <Package size={42} className="mb-3 text-secondary" />
+                      <h3 className="text-base font-semibold text-primary">
                         No inventory found
                       </h3>
-
-                      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                        Add inventory for one of your products to start managing stock.
+                      <p className="mt-1 max-w-sm text-sm text-secondary">
+                        Add inventory for one of your products to start managing
+                        stock.
                       </p>
-
                       <Button
                         type="button"
                         onClick={handleCreate}
-                        className="mt-5 gap-2"
+                        className="mt-5 inline-flex items-center gap-2"
                       >
                         <Plus size={17} />
                         Add Inventory
@@ -644,83 +411,61 @@ useEffect(() => {
                   return (
                     <tr
                       key={item._id}
-                      className="transition hover:bg-muted/30"
+                      className="transition hover:bg-surface"
                     >
-                      {/* Product */}
-
                       <td className="px-5 py-4">
-                        <p className="max-w-[260px] truncate font-semibold">
+                        <p className="max-w-[260px] truncate font-semibold text-primary">
                           {getProductName(product)}
                         </p>
                       </td>
 
-                      {/* SKU */}
-
                       <td className="px-5 py-4">
-                        <span className="font-mono text-xs">
+                        <span className="font-mono text-xs text-primary">
                           {getProductSku(product)}
                         </span>
                       </td>
-
-                      {/* Variant */}
 
                       <td className="px-5 py-4">
                         {item.color || item.size ? (
                           <div className="flex max-w-[220px] flex-wrap gap-1.5">
                             {item.color && (
-                              <span className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs">
+                              <span className="rounded-lg border border-primary bg-surface px-2.5 py-1 text-xs text-primary">
                                 Color: {item.color}
                               </span>
                             )}
-
                             {item.size && (
-                              <span className="rounded-lg border border-border bg-muted px-2.5 py-1 text-xs">
+                              <span className="rounded-lg border border-primary bg-surface px-2.5 py-1 text-xs text-primary">
                                 Size: {item.size}
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-muted-foreground">
-                            No Variant
-                          </span>
+                          <span className="text-secondary">No Variant</span>
                         )}
                       </td>
 
-                      {/* Quantity */}
-
                       <td className="px-5 py-4">
                         <div className="whitespace-nowrap">
-                          <span className="font-semibold">
+                          <span className="font-semibold text-primary">
                             {item.quantity}
                           </span>
-
-                          <span className="ml-2 text-xs text-muted-foreground">
+                          <span className="ml-2 text-xs text-secondary">
                             / min {item.minStock}
                           </span>
                         </div>
                       </td>
 
-                      {/* Purchase */}
-
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <span className="font-medium">
-                          {Number(
-                            item.purchasePrice || 0
-                          ).toLocaleString()}
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <span className="font-medium text-primary">
+                          {formatMoney(item.purchasePrice)}
                         </span>
                       </td>
 
-                      {/* Sale */}
-
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <span className="font-medium">
-                          {Number(
-                            item.salePrice || 0
-                          ).toLocaleString()}
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <span className="font-medium text-primary">
+                          {formatMoney(item.salePrice)}
                         </span>
                       </td>
-
-                      {/* Status */}
 
                       <td className="px-5 py-4">
                         <span
@@ -731,39 +476,29 @@ useEffect(() => {
                         </span>
                       </td>
 
-                      {/* Actions */}
-
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() =>
-                              setSelectedInventory(item)
-                            }
-                            className="rounded-lg border border-border p-2 transition hover:bg-muted"
+                            onClick={() => setSelectedInventory(item)}
+                            className="rounded-lg border border-primary p-2 text-secondary transition hover:bg-muted-action hover:text-primary"
                             title="View Inventory"
                           >
                             <Eye size={16} />
                           </button>
-
                           <button
                             type="button"
-                            onClick={() =>
-                              handleEdit(item)
-                            }
-                            className="rounded-lg border border-border p-2 transition hover:bg-muted"
+                            onClick={() => handleEdit(item)}
+                            className="rounded-lg border border-primary p-2 text-secondary transition hover:bg-muted-action hover:text-primary"
                             title="Edit Inventory"
                           >
                             <Pencil size={16} />
                           </button>
-
                           <button
                             type="button"
-                            onClick={() =>
-                              handleDelete(item._id)
-                            }
+                            onClick={() => handleDelete(item._id)}
                             disabled={isDeleting}
-                            className="rounded-lg border border-red-500/20 p-2 text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="rounded-lg border border-[var(--color-danger)]/20 p-2 text-[var(--color-danger)] transition hover:bg-[var(--color-danger)]/10 disabled:cursor-not-allowed disabled:opacity-50"
                             title="Delete Inventory"
                           >
                             <Trash2 size={16} />
@@ -778,39 +513,25 @@ useEffect(() => {
           </table>
         </div>
 
-        {/* ==================================================
-            PAGINATION
-        ================================================== */}
-
         {pagination.totalPages > 1 && (
-          <div className="flex flex-col gap-4 border-t border-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-
-            <p className="text-center text-sm text-muted-foreground sm:text-left">
-              Page {pagination.page} of{" "}
-              {pagination.totalPages}
+          <div className="flex flex-col gap-4 border-t border-secondary px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="text-center text-sm text-secondary sm:text-left">
+              Page {pagination.page} of {pagination.totalPages}
             </p>
-
             <div className="flex w-full gap-2 sm:w-auto">
               <button
                 type="button"
                 disabled={page <= 1}
-                onClick={() =>
-                  handlePageChange(page - 1)
-                }
-                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+                onClick={() => handlePageChange(page - 1)}
+                className="flex-1 rounded-lg border border-primary px-3 py-2 text-sm text-primary transition hover:bg-muted-action disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
               >
                 Previous
               </button>
-
               <button
                 type="button"
-                disabled={
-                  page >= pagination.totalPages
-                }
-                onClick={() =>
-                  handlePageChange(page + 1)
-                }
-                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+                disabled={page >= pagination.totalPages}
+                onClick={() => handlePageChange(page + 1)}
+                className="flex-1 rounded-lg border border-primary px-3 py-2 text-sm text-primary transition hover:bg-muted-action disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
               >
                 Next
               </button>
@@ -818,10 +539,6 @@ useEffect(() => {
           </div>
         )}
       </div>
-
-      {/* ==================================================
-          CREATE / EDIT FORM
-      ================================================== */}
 
       {showForm && (
         <InventoryForm
@@ -833,10 +550,6 @@ useEffect(() => {
           onSubmit={handleSubmit}
         />
       )}
-
-      {/* ==================================================
-          VIEW INVENTORY
-      ================================================== */}
 
       {selectedInventory && (
         <InventoryDetails
@@ -853,25 +566,15 @@ useEffect(() => {
 // SUMMARY CARD
 // ======================================================
 
-function SummaryCard({
-  title,
-  value,
-  icon: Icon,
-}) {
+function SummaryCard({ title, value, icon: Icon }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div className="rounded-2xl border border-primary bg-card p-5 shadow-sm">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">
-            {title}
-          </p>
-
-          <p className="mt-2 text-2xl font-bold">
-            {value}
-          </p>
+          <p className="text-sm text-secondary">{title}</p>
+          <p className="mt-2 text-2xl font-bold text-primary">{value}</p>
         </div>
-
-        <div className="shrink-0 rounded-xl bg-primary/10 p-3 text-primary">
+        <div className="shrink-0 rounded-xl bg-brand/10 p-3 text-brand">
           <Icon size={21} />
         </div>
       </div>
@@ -894,102 +597,45 @@ function InventoryForm({
   const isEdit = Boolean(inventory);
 
   const [form, setForm] = useState({
-    product:
-      inventory?.product?._id ||
-      inventory?.product ||
-      "",
-
+    product: inventory?.product?._id || inventory?.product || "",
     color: inventory?.color || "",
     size: inventory?.size || "",
-
-    quantity:
-      inventory?.quantity ?? 0,
-
-    minStock:
-      inventory?.minStock ?? 0,
-
-    maxStock:
-      inventory?.maxStock ?? "",
-
-    purchasePrice:
-      inventory?.purchasePrice ?? "",
-
-    salePrice:
-      inventory?.salePrice ?? "",
-
-    discount:
-      inventory?.discount ?? 0,
-
-    tax:
-      inventory?.tax ?? 0,
+    quantity: inventory?.quantity ?? 0,
+    minStock: inventory?.minStock ?? 0,
+    maxStock: inventory?.maxStock ?? "",
+    purchasePrice: inventory?.purchasePrice ?? "",
+    salePrice: inventory?.salePrice ?? "",
+    discount: inventory?.discount ?? 0,
+    tax: inventory?.tax ?? 0,
   });
 
   const selectedProduct = useMemo(() => {
-    const product = products.find(
-      (item) => item._id === form.product
-    );
-
-    if (product) {
-      return product;
-    }
-
-    if (isEdit && inventory?.product) {
-      return inventory.product;
-    }
-
+    const product = products.find((item) => item._id === form.product);
+    if (product) return product;
+    if (isEdit && inventory?.product) return inventory.product;
     return null;
-  }, [
-    products,
-    form.product,
-    isEdit,
-    inventory,
-  ]);
+  }, [products, form.product, isEdit, inventory]);
 
-  const hasVariants =
-    selectedProduct?.hasVariants === true;
-
-  // ====================================================
-  // CHANGE
-  // ====================================================
+  const hasVariants = selectedProduct?.hasVariants === true;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
-
-  // ====================================================
-  // PRODUCT CHANGE
-  // ====================================================
 
   const handleProductChange = (e) => {
     const productId = e.target.value;
-
-    const product = products.find(
-      (item) => item._id === productId
-    );
+    const product = products.find((item) => item._id === productId);
 
     setForm((prev) => ({
       ...prev,
       product: productId,
-
-      purchasePrice:
-        product?.purchasePrice ?? "",
-
-      salePrice:
-        product?.salePrice ?? "",
-
+      purchasePrice: product?.purchasePrice ?? "",
+      salePrice: product?.salePrice ?? "",
       color: "",
       size: "",
     }));
   };
-
-  // ====================================================
-  // SUBMIT
-  // ====================================================
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -999,108 +645,55 @@ function InventoryForm({
       return;
     }
 
-    if (
-      form.quantity === "" ||
-      Number(form.quantity) < 0
-    ) {
-      toast.error(
-        "Please enter a valid quantity."
-      );
+    if (form.quantity === "" || Number(form.quantity) < 0) {
+      toast.error("Please enter a valid quantity.");
       return;
     }
 
-    if (
-      form.minStock === "" ||
-      Number(form.minStock) < 0
-    ) {
-      toast.error(
-        "Please enter a valid minimum stock."
-      );
+    if (form.minStock === "" || Number(form.minStock) < 0) {
+      toast.error("Please enter a valid minimum stock.");
       return;
     }
 
     if (
       form.maxStock !== "" &&
-      Number(form.maxStock) <
-        Number(form.minStock)
+      Number(form.maxStock) < Number(form.minStock)
     ) {
-      toast.error(
-        "Maximum stock cannot be less than minimum stock."
-      );
+      toast.error("Maximum stock cannot be less than minimum stock.");
       return;
     }
 
-    if (
-      form.purchasePrice !== "" &&
-      Number(form.purchasePrice) < 0
-    ) {
-      toast.error(
-        "Purchase price cannot be negative."
-      );
+    if (form.purchasePrice !== "" && Number(form.purchasePrice) < 0) {
+      toast.error("Purchase price cannot be negative.");
       return;
     }
 
-    if (
-      form.salePrice !== "" &&
-      Number(form.salePrice) < 0
-    ) {
-      toast.error(
-        "Sale price cannot be negative."
-      );
+    if (form.salePrice !== "" && Number(form.salePrice) < 0) {
+      toast.error("Sale price cannot be negative.");
       return;
     }
 
-    if (
-      Number(form.discount || 0) < 0 ||
-      Number(form.discount || 0) > 100
-    ) {
-      toast.error(
-        "Discount must be between 0 and 100."
-      );
+    if (Number(form.discount || 0) < 0 || Number(form.discount || 0) > 100) {
+      toast.error("Discount must be between 0 and 100.");
       return;
     }
 
     if (Number(form.tax || 0) < 0) {
-      toast.error(
-        "Tax cannot be negative."
-      );
+      toast.error("Tax cannot be negative.");
       return;
     }
 
     const payload = {
       product: form.product,
-
-      color: hasVariants
-        ? form.color.trim() || null
-        : null,
-
-      size: hasVariants
-        ? form.size.trim() || null
-        : null,
-
+      color: hasVariants ? form.color.trim() || null : null,
+      size: hasVariants ? form.size.trim() || null : null,
       quantity: Number(form.quantity),
-
       minStock: Number(form.minStock),
-
-      maxStock:
-        form.maxStock === ""
-          ? null
-          : Number(form.maxStock),
-
+      maxStock: form.maxStock === "" ? null : Number(form.maxStock),
       purchasePrice:
-        form.purchasePrice === ""
-          ? 0
-          : Number(form.purchasePrice),
-
-      salePrice:
-        form.salePrice === ""
-          ? 0
-          : Number(form.salePrice),
-
-      discount: Number(
-        form.discount || 0
-      ),
-
+        form.purchasePrice === "" ? 0 : Number(form.purchasePrice),
+      salePrice: form.salePrice === "" ? 0 : Number(form.salePrice),
+      discount: Number(form.discount || 0),
       tax: Number(form.tax || 0),
     };
 
@@ -1109,125 +702,80 @@ function InventoryForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4">
-
-      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:max-h-[calc(100dvh-2rem)]">
-
-        {/* Header */}
-
-        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-border bg-card px-4 py-4 sm:px-6 sm:py-5">
-
+      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-3xl flex-col overflow-hidden rounded-2xl border border-primary bg-card shadow-2xl sm:max-h-[calc(100dvh-2rem)]">
+        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-secondary bg-card px-4 py-4 sm:px-6 sm:py-5">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-bold sm:text-xl">
-              {isEdit
-                ? "Update Product Inventory"
-                : "Add Product Inventory"}
+            <h2 className="truncate text-lg font-bold text-primary sm:text-xl">
+              {isEdit ? "Update Product Inventory" : "Add Product Inventory"}
             </h2>
-
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+            <p className="mt-1 text-xs text-secondary sm:text-sm">
               {isEdit
                 ? "Update stock and pricing information."
                 : "Add stock and pricing information for a product."}
             </p>
           </div>
-
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg p-2 transition hover:bg-muted"
+            className="shrink-0 rounded-lg p-2 text-secondary transition hover:bg-muted-action hover:text-primary"
             aria-label="Close"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Form */}
-
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-6 p-4 sm:p-6"
-          >
-
-            {/* Product */}
-
+          <form onSubmit={handleSubmit} className="space-y-6 p-4 sm:p-6">
             <div>
-              <label className="mb-2 block text-sm font-medium">
+              <label className="mb-2 block text-sm font-medium text-primary">
                 Product
-                <span className="ml-1 text-red-500">
-                  *
-                </span>
+                <span className="ml-1 text-[var(--color-danger)]">*</span>
               </label>
-
               <select
                 name="product"
                 value={form.product}
                 onChange={handleProductChange}
-                disabled={
-                  isEdit ||
-                  productsLoading
-                }
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isEdit || productsLoading}
+                className="h-11 w-full rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none transition focus:border-brand disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <option value="">
-                  {productsLoading
-                    ? "Loading products..."
-                    : "Select Product"}
+                  {productsLoading ? "Loading products..." : "Select Product"}
                 </option>
-
                 {products.map((product) => (
-                  <option
-                    key={product._id}
-                    value={product._id}
-                  >
-                    {getProductName(product)}
-                    {" — "}
-                    {getProductSku(product)}
+                  <option key={product._id} value={product._id}>
+                    {getProductName(product)} — {getProductSku(product)}
                   </option>
                 ))}
               </select>
 
               {selectedProduct && (
-                <div className="mt-3 rounded-xl border border-border bg-muted/30 p-4">
+                <div className="mt-3 rounded-xl border border-primary bg-surface p-4">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <InfoItem
                       label="Product"
-                      value={getProductName(
-                        selectedProduct
-                      )}
+                      value={getProductName(selectedProduct)}
                     />
-
                     <InfoItem
                       label="Brand"
-                      value={getProductBrand(
-                        selectedProduct
-                      )}
+                      value={getProductBrand(selectedProduct)}
                     />
-
                     <InfoItem
                       label="Model"
-                      value={getProductModel(
-                        selectedProduct
-                      )}
+                      value={getProductModel(selectedProduct)}
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Variant */}
-
             {hasVariants && (
               <div>
                 <div className="mb-3">
-                  <h3 className="font-semibold">
-                    Product Variant
-                  </h3>
-
-                  <p className="text-xs text-muted-foreground">
+                  <h3 className="font-semibold text-primary">Product Variant</h3>
+                  <p className="text-xs text-secondary">
                     Add color and size for this inventory variant.
                   </p>
                 </div>
-
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <FormField
                     label="Color"
@@ -1236,7 +784,6 @@ function InventoryForm({
                     onChange={handleChange}
                     placeholder="e.g. Black"
                   />
-
                   <FormField
                     label="Size"
                     name="size"
@@ -1248,19 +795,13 @@ function InventoryForm({
               </div>
             )}
 
-            {/* Stock */}
-
             <div>
               <div className="mb-3">
-                <h3 className="font-semibold">
-                  Stock Information
-                </h3>
-
-                <p className="text-xs text-muted-foreground">
+                <h3 className="font-semibold text-primary">Stock Information</h3>
+                <p className="text-xs text-secondary">
                   Configure current and stock-limit values.
                 </p>
               </div>
-
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <FormField
                   label="Quantity"
@@ -1271,7 +812,6 @@ function InventoryForm({
                   onChange={handleChange}
                   required
                 />
-
                 <FormField
                   label="Minimum Stock"
                   name="minStock"
@@ -1280,7 +820,6 @@ function InventoryForm({
                   value={form.minStock}
                   onChange={handleChange}
                 />
-
                 <FormField
                   label="Maximum Stock"
                   name="maxStock"
@@ -1293,19 +832,13 @@ function InventoryForm({
               </div>
             </div>
 
-            {/* Pricing */}
-
             <div>
               <div className="mb-3">
-                <h3 className="font-semibold">
-                  Pricing
-                </h3>
-
-                <p className="text-xs text-muted-foreground">
+                <h3 className="font-semibold text-primary">Pricing</h3>
+                <p className="text-xs text-secondary">
                   Set inventory-level purchase and selling prices.
                 </p>
               </div>
-
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   label="Purchase Price"
@@ -1316,7 +849,6 @@ function InventoryForm({
                   value={form.purchasePrice}
                   onChange={handleChange}
                 />
-
                 <FormField
                   label="Sale Price"
                   name="salePrice"
@@ -1326,7 +858,6 @@ function InventoryForm({
                   value={form.salePrice}
                   onChange={handleChange}
                 />
-
                 <FormField
                   label="Discount (%)"
                   name="discount"
@@ -1337,7 +868,6 @@ function InventoryForm({
                   value={form.discount}
                   onChange={handleChange}
                 />
-
                 <FormField
                   label="Tax"
                   name="tax"
@@ -1350,9 +880,7 @@ function InventoryForm({
               </div>
             </div>
 
-            {/* Buttons */}
-
-            <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
+            <div className="flex flex-col-reverse gap-3 border-t border-secondary pt-5 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
@@ -1362,26 +890,20 @@ function InventoryForm({
               >
                 Cancel
               </Button>
-
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full gap-2 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
               >
                 {loading ? (
                   <>
-                    <RefreshCw
-                      size={17}
-                      className="animate-spin"
-                    />
+                    <RefreshCw size={17} className="animate-spin" />
                     Saving...
                   </>
                 ) : (
                   <>
                     <Plus size={17} />
-                    {isEdit
-                      ? "Update Inventory"
-                      : "Add Inventory"}
+                    {isEdit ? "Update Inventory" : "Add Inventory"}
                   </>
                 )}
               </Button>
@@ -1392,10 +914,6 @@ function InventoryForm({
     </div>
   );
 }
-
-// ======================================================
-// FORM FIELD
-// ======================================================
 
 function FormField({
   label,
@@ -1411,16 +929,12 @@ function FormField({
 }) {
   return (
     <div className="min-w-0">
-      <label className="mb-2 block text-sm font-medium">
+      <label className="mb-2 block text-sm font-medium text-primary">
         {label}
-
         {required && (
-          <span className="ml-1 text-red-500">
-            *
-          </span>
+          <span className="ml-1 text-[var(--color-danger)]">*</span>
         )}
       </label>
-
       <input
         type={type}
         name={name}
@@ -1431,28 +945,18 @@ function FormField({
         min={min}
         max={max}
         step={step}
-        className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-primary"
+        className="h-11 w-full rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none transition focus:border-brand"
       />
     </div>
   );
 }
 
-// ======================================================
-// INFO ITEM
-// ======================================================
-
-function InfoItem({
-  label,
-  value,
-}) {
+function InfoItem({ label, value }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs text-muted-foreground">
-        {label}
-      </p>
-
+      <p className="text-xs text-secondary">{label}</p>
       <p
-        className="mt-1 truncate text-sm font-medium"
+        className="mt-1 truncate text-sm font-medium text-primary"
         title={String(value ?? "")}
       >
         {value}
@@ -1461,145 +965,75 @@ function InfoItem({
   );
 }
 
-// ======================================================
-// INVENTORY DETAILS
-// ======================================================
-
-function InventoryDetails({
-  inventory,
-  onClose,
-  onEdit,
-}) {
+function InventoryDetails({ inventory, onClose, onEdit }) {
   const product = inventory?.product;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4">
-
-      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:max-h-[calc(100dvh-2rem)]">
-
-        {/* Header */}
-
-        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-border bg-card px-4 py-4 sm:px-6 sm:py-5">
-
+      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-2xl border border-primary bg-card shadow-2xl sm:max-h-[calc(100dvh-2rem)]">
+        <div className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-4 border-b border-secondary bg-card px-4 py-4 sm:px-6 sm:py-5">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold sm:text-xl">
+            <h2 className="text-lg font-bold text-primary sm:text-xl">
               Inventory Details
             </h2>
-
             <p
-              className="mt-1 truncate text-sm text-muted-foreground"
+              className="mt-1 truncate text-sm text-secondary"
               title={getProductName(product)}
             >
               {getProductName(product)}
             </p>
           </div>
-
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg p-2 transition hover:bg-muted"
+            className="shrink-0 rounded-lg p-2 text-secondary transition hover:bg-muted-action hover:text-primary"
             aria-label="Close"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Details */}
-
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:gap-4 sm:p-6">
-
-            <DetailItem
-              label="Product"
-              value={getProductName(product)}
-            />
-
-            <DetailItem
-              label="SKU"
-              value={getProductSku(product)}
-            />
-
-            <DetailItem
-              label="Brand"
-              value={getProductBrand(product)}
-            />
-
-            <DetailItem
-              label="Model"
-              value={getProductModel(product)}
-            />
-
+            <DetailItem label="Product" value={getProductName(product)} />
+            <DetailItem label="SKU" value={getProductSku(product)} />
+            <DetailItem label="Brand" value={getProductBrand(product)} />
+            <DetailItem label="Model" value={getProductModel(product)} />
             <DetailItem
               label="Color"
-              value={
-                inventory.color ||
-                "No Variant"
-              }
+              value={inventory.color || "No Variant"}
             />
-
             <DetailItem
               label="Size"
-              value={
-                inventory.size ||
-                "No Variant"
-              }
+              value={inventory.size || "No Variant"}
             />
-
-            <DetailItem
-              label="Quantity"
-              value={inventory.quantity}
-            />
-
-            <DetailItem
-              label="Minimum Stock"
-              value={inventory.minStock}
-            />
-
+            <DetailItem label="Quantity" value={inventory.quantity} />
+            <DetailItem label="Minimum Stock" value={inventory.minStock} />
             <DetailItem
               label="Maximum Stock"
-              value={
-                inventory.maxStock ??
-                "No Limit"
-              }
+              value={inventory.maxStock ?? "No Limit"}
             />
-
             <DetailItem
               label="Purchase Price"
-              value={Number(
-                inventory.purchasePrice || 0
-              ).toLocaleString()}
+              value={formatMoney(inventory.purchasePrice)}
             />
-
             <DetailItem
               label="Sale Price"
-              value={Number(
-                inventory.salePrice || 0
-              ).toLocaleString()}
+              value={formatMoney(inventory.salePrice)}
             />
-
             <DetailItem
               label="Discount"
               value={`${inventory.discount || 0}%`}
             />
-
-            <DetailItem
-              label="Tax"
-              value={inventory.tax || 0}
-            />
-
+            <DetailItem label="Tax" value={inventory.tax || 0} />
             <DetailItem
               label="Stock Status"
-              value={
-                getStockStatus(inventory).label
-              }
+              value={getStockStatus(inventory).label}
             />
           </div>
         </div>
 
-        {/* Footer */}
-
-        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-border bg-card p-4 sm:flex-row sm:justify-end sm:p-5">
-
+        <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-secondary bg-card p-4 sm:flex-row sm:justify-end sm:p-5">
           <Button
             type="button"
             variant="outline"
@@ -1608,38 +1042,26 @@ function InventoryDetails({
           >
             Close
           </Button>
-
           <Button
             type="button"
             onClick={onEdit}
-            className="w-full gap-2 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
           >
             <Pencil size={16} />
             Edit Inventory
           </Button>
-
         </div>
       </div>
     </div>
   );
 }
 
-// ======================================================
-// DETAIL ITEM
-// ======================================================
-
-function DetailItem({
-  label,
-  value,
-}) {
+function DetailItem({ label, value }) {
   return (
-    <div className="min-w-0 rounded-xl border border-border bg-muted/20 p-3 sm:p-4">
-      <p className="text-xs text-muted-foreground">
-        {label}
-      </p>
-
+    <div className="min-w-0 rounded-xl border border-primary bg-surface p-3 sm:p-4">
+      <p className="text-xs text-secondary">{label}</p>
       <p
-        className="mt-1 break-words text-sm font-semibold"
+        className="mt-1 break-words text-sm font-semibold text-primary"
         title={String(value ?? "")}
       >
         {value}
@@ -1648,29 +1070,18 @@ function DetailItem({
   );
 }
 
-// ======================================================
-// SKELETON
-// ======================================================
-
 function InventorySkeleton() {
   return (
     <>
-      {Array.from({ length: 6 }).map(
-        (_, index) => (
-          <tr key={index}>
-            {Array.from({ length: 8 }).map(
-              (_, cellIndex) => (
-                <td
-                  key={cellIndex}
-                  className="px-5 py-5"
-                >
-                  <div className="h-4 animate-pulse rounded bg-muted" />
-                </td>
-              )
-            )}
-          </tr>
-        )
-      )}
+      {Array.from({ length: 6 }).map((_, index) => (
+        <tr key={index}>
+          {Array.from({ length: 8 }).map((_, cellIndex) => (
+            <td key={cellIndex} className="px-5 py-5">
+              <div className="h-4 animate-pulse rounded bg-muted-action" />
+            </td>
+          ))}
+        </tr>
+      ))}
     </>
   );
 }

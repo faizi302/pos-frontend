@@ -25,6 +25,16 @@ import Category from "./pages/category/Category";
 
 //pos
 import POS from "./pages/pos/Pos";
+// import PaymentReturn from "./pages/pos/PaymentReturn";
+
+// Sales
+import CashRegister from "./pages/cashRegister/CashRegister";
+import Sales from "./pages/sales/Sales";
+import SalePayments from "./pages/sales/SalePayments";
+import SaleItems from "./pages/sales/SaleItems";
+
+import Customer from "./pages/customer/Customer";
+import CustomerForm from "./pages/customer/CustomerForm";
 
 import CreateManager from "./pages/users/CreateManager";
 import UserDetails from "./pages/users/UserDetails";
@@ -269,11 +279,70 @@ export default function App() {
             }
           />
 
+          {/* POS */}
           <Route
             path="/pos"
             element={
               <PermissionRoute permission="sales.create">
                 <POS />
+              </PermissionRoute>
+            }
+          />
+
+          {/* Gateway checkout return page (PayPal / JazzCash / EasyPaisa) */}
+          {/* <Route
+            path="/pos/payment-return"
+            element={
+              <PermissionRoute permission="sales.create">
+                <PaymentReturn />
+              </PermissionRoute>
+            }
+          /> */}
+
+          {/* Sales */}
+          <Route
+            path="/sales"
+            element={
+              <PermissionRoute permission="sales.read">
+                <Sales />
+              </PermissionRoute>
+            }
+          />
+
+          {/* Sale Items */}
+          <Route
+            path="/sale-items"
+            element={
+              <PermissionRoute permission="sale-items.read">
+                <SaleItems />
+              </PermissionRoute>
+            }
+          />
+
+          {/* Sale Payments */}
+          <Route
+            path="/sale-payments"
+            element={
+              <PermissionRoute permission="sale-payments.read">
+                <SalePayments />
+              </PermissionRoute>
+            }
+          />
+
+          <Route
+            path="/customers"
+            element={
+              <PermissionRoute permission="customers.read">
+                <Customer />
+              </PermissionRoute>
+            }
+          />
+
+          <Route
+            path="/cash-register"
+            element={
+              <PermissionRoute permission="cash-registers.read">
+                <CashRegister />
               </PermissionRoute>
             }
           />
