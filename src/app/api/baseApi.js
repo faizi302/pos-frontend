@@ -28,6 +28,9 @@ export const baseApi = createApi({
     "SalePayment",
     "CashRegister",
     "Payment",
+      // Expenses
+    "Expense",
+    "ExpenseCategory",
   ],
 
   endpoints: () => ({}),
