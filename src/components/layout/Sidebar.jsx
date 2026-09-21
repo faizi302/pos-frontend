@@ -5,9 +5,9 @@ import {
   ChevronsRight,
   ChevronDown,
   ChevronRight,
-  LayoutGrid,
   X,
 } from "lucide-react";
+
 
 import { sidebarConfig } from "@/config/sidebarConfig";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -268,22 +268,25 @@ export default function Sidebar({
           HEADER
       ================================================= */}
 
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-secondary px-4">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-secondary px-3">
 
-        <div className="flex items-center gap-2 overflow-hidden">
+        {/* Logo container – fills available space */}
+        <div className="flex min-w-0 flex-1 items-center overflow-hidden">
 
-          {/* Logo */}
-
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-white">
-            <LayoutGrid className="h-4.5 w-4.5" />
-          </div>
-
-          {/* Brand Name */}
-
-          {!collapsed && (
-            <span className="truncate font-semibold text-primary">
-              POS SaaS
-            </span>
+          {collapsed ? (
+            // Collapsed: square logo, centered
+            <img
+              src="/favicon.png"
+              alt="POS"
+              className="mx-auto h-9 w-9 shrink-0 object-contain"
+            />
+          ) : (
+            // Expanded + Mobile: full logo that fills the header height & width
+            <img
+              src="/images/nexora3.png"
+              alt="Nexora"
+              className="h-full w-auto w-full object-cover "
+            />
           )}
 
         </div>
@@ -295,7 +298,7 @@ export default function Sidebar({
         <button
           type="button"
           onClick={onCloseMobile}
-          className="rounded-lg p-1.5 text-secondary hover:bg-muted-action md:hidden"
+          className="ml-2 shrink-0 rounded-lg p-1.5 text-secondary hover:bg-muted-action md:hidden"
           aria-label="Close menu"
         >
           <X className="h-5 w-5" />
