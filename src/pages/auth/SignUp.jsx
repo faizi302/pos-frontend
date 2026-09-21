@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+
 import { UserRound, Upload, X } from "lucide-react";
+
 import { useNavigate } from "react-router-dom";
+
 import toast from "react-hot-toast";
 
 import Input from "@/components/ui/Input";
@@ -9,12 +12,15 @@ import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 
 import { useSignupMutation } from "../../features/auth/authApi";
+
 import {
   useGetPublicBusinessesQuery,
 } from "../../features/businesses/businessesApi";
+
 import {
   useGetPublicBusinessTypesByBusinessQuery,
 } from "../../features/businessTypes/businessTypesApi";
+
 
 const emptyForm = {
   name: "",
@@ -25,22 +31,28 @@ const emptyForm = {
   businessType: "",
 };
 
+
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 
 const Signup = () => {
   const navigate = useNavigate();
+
   const fileInputRef = useRef(null);
 
   const [form, setForm] = useState(emptyForm);
+
   const [avatar, setAvatar] = useState(null);
+
   const [avatarPreview, setAvatarPreview] = useState("");
+
   const [errors, setErrors] = useState({});
 
   const [signup, { isLoading: isSigningUp }] = useSignupMutation();
 
+
   // =====================================================
   // PUBLIC BUSINESSES
-  // GET /api/business/public
   // =====================================================
 
   const {
@@ -49,9 +61,9 @@ const Signup = () => {
     isError: isBusinessError,
   } = useGetPublicBusinessesQuery();
 
+
   // =====================================================
   // PUBLIC BUSINESS TYPES
-  // GET /api/business-type/public/business/:businessId
   // =====================================================
 
   const {
@@ -63,6 +75,7 @@ const Signup = () => {
     skip: !form.business,
   });
 
+
   // =====================================================
   // ERROR HANDLING
   // =====================================================
@@ -73,11 +86,13 @@ const Signup = () => {
     }
   }, [isBusinessError]);
 
+
   useEffect(() => {
     if (isBusinessTypeError) {
       toast.error("Unable to load business types");
     }
   }, [isBusinessTypeError]);
+
 
   // =====================================================
   // OPTIONS
@@ -90,12 +105,14 @@ const Signup = () => {
       label: business.name,
     }));
 
+
   const businessTypeOptions = businessTypes
     .filter((businessType) => businessType.isActive !== false)
     .map((businessType) => ({
       value: businessType._id,
       label: businessType.name,
     }));
+
 
   // =====================================================
   // HANDLE INPUT CHANGE
@@ -126,6 +143,7 @@ const Signup = () => {
     }));
   };
 
+
   // =====================================================
   // AVATAR
   // =====================================================
@@ -152,8 +170,10 @@ const Signup = () => {
     setAvatar(file);
 
     const previewUrl = URL.createObjectURL(file);
+
     setAvatarPreview(previewUrl);
   };
+
 
   const handleRemoveAvatar = () => {
     if (avatarPreview) {
@@ -161,12 +181,14 @@ const Signup = () => {
     }
 
     setAvatar(null);
+
     setAvatarPreview("");
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
+
 
   // =====================================================
   // VALIDATION
@@ -212,6 +234,7 @@ const Signup = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+
   // =====================================================
   // SUBMIT
   // =====================================================
@@ -228,10 +251,18 @@ const Signup = () => {
       const formData = new FormData();
 
       formData.append("name", form.name.trim());
-      formData.append("email", form.email.trim().toLowerCase());
+
+      formData.append(
+        "email",
+        form.email.trim().toLowerCase()
+      );
+
       formData.append("phone", form.phone.trim());
+
       formData.append("password", form.password);
+
       formData.append("business", form.business);
+
       formData.append("businessType", form.businessType);
 
       if (avatar) {
@@ -246,6 +277,7 @@ const Signup = () => {
       );
 
       navigate("/login");
+
     } catch (error) {
       const message =
         error?.data?.message ||
@@ -256,43 +288,81 @@ const Signup = () => {
     }
   };
 
+
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-2xl">
-        <div className="bg-card border border-primary rounded-2xl shadow-sm overflow-hidden">
-          {/* Header */}
-          <div className="px-6 sm:px-8 pt-7 pb-5 border-b border-primary">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-brand flex items-center justify-center">
-                <UserRound className="w-5 h-5 text-white" />
-              </div>
+    <div className="w-full min-h-screen bg-surface flex items-center justify-center">
 
-              <div>
-                <h1 className="text-2xl font-semibold text-primary">
-                  Create Account
-                </h1>
+      {/* =====================================================
+          SIGNUP CONTENT
+      ===================================================== */}
 
-                <p className="text-sm text-secondary mt-1">
-                  Register your Admin account and select your business.
-                </p>
-              </div>
+      <div className="w-full">
+
+        {/* =====================================================
+            HEADER
+        ===================================================== */}
+
+        <div className="w-full pb-5 border-b border-primary">
+
+          <div className="flex items-center gap-3">
+
+            <div className="w-11 h-11 shrink-0 rounded-xl bg-brand flex items-center justify-center">
+
+              <UserRound className="w-5 h-5 text-white" />
+
             </div>
+
+            <div className="min-w-0">
+
+              <h1 className="text-xl sm:text-2xl font-semibold text-primary">
+                Create Account
+              </h1>
+
+              <p className="text-sm text-secondary mt-1">
+                Register your Admin account and select your business.
+              </p>
+
+            </div>
+
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
-            {/* Avatar */}
-            <div>
+        </div>
+
+
+        {/* =====================================================
+            SCROLLABLE FORM
+        ===================================================== */}
+
+        <div className="w-full max-h-[calc(100vh-150px)] overflow-y-auto">
+
+          <form
+            onSubmit={handleSubmit}
+            className="w-full space-y-6 pt-6"
+            noValidate
+          >
+
+            {/* =====================================================
+                AVATAR
+            ===================================================== */}
+
+            <div className="w-full">
+
               <label className="block text-sm font-medium text-primary mb-3">
-                Profile Picture
+                Profile Picture{" "}
                 <span className="text-secondary font-normal">
-                  {" "}
                   (Optional)
                 </span>
               </label>
 
+
               <div className="flex items-center gap-4">
-                <div className="relative">
+
+                {/* Avatar Preview */}
+
+                <div className="relative shrink-0">
+
                   <div className="w-20 h-20 rounded-full border border-primary bg-surface overflow-hidden flex items-center justify-center">
+
                     {avatarPreview ? (
                       <img
                         src={avatarPreview}
@@ -302,20 +372,28 @@ const Signup = () => {
                     ) : (
                       <UserRound className="w-8 h-8 text-secondary" />
                     )}
+
                   </div>
+
 
                   {avatarPreview && (
                     <button
                       type="button"
                       onClick={handleRemoveAvatar}
                       className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+                      aria-label="Remove profile picture"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
+
                 </div>
 
-                <div>
+
+                {/* Upload */}
+
+                <div className="min-w-0">
+
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -327,7 +405,9 @@ const Signup = () => {
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() =>
+                      fileInputRef.current?.click()
+                    }
                   >
                     <Upload className="w-4 h-4 mr-2" />
                     Upload Image
@@ -336,17 +416,27 @@ const Signup = () => {
                   <p className="text-xs text-secondary mt-2">
                     JPG, PNG or WEBP. Maximum 5MB.
                   </p>
+
                 </div>
+
               </div>
+
             </div>
 
-            {/* Personal Information */}
-            <div>
+
+            {/* =====================================================
+                PERSONAL INFORMATION
+            ===================================================== */}
+
+            <div className="w-full">
+
               <h2 className="text-base font-semibold text-primary mb-4">
                 Personal Information
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+
                 <Input
                   label="Full Name"
                   name="name"
@@ -356,6 +446,7 @@ const Signup = () => {
                   error={errors.name}
                   required
                 />
+
 
                 <Input
                   label="Email"
@@ -368,6 +459,7 @@ const Signup = () => {
                   required
                 />
 
+
                 <Input
                   label="Phone"
                   name="phone"
@@ -378,6 +470,7 @@ const Signup = () => {
                   required
                 />
 
+
                 <PasswordInput
                   label="Password"
                   name="password"
@@ -387,18 +480,29 @@ const Signup = () => {
                   error={errors.password}
                   required
                 />
+
               </div>
+
             </div>
 
-            {/* Account & Business */}
-            <div>
+
+            {/* =====================================================
+                ACCOUNT & BUSINESS
+            ===================================================== */}
+
+            <div className="w-full">
+
               <h2 className="text-base font-semibold text-primary mb-4">
                 Account & Business
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+
                 {/* Role */}
-                <div>
+
+                <div className="w-full">
+
                   <label className="block text-sm font-medium text-primary mb-2">
                     Role
                   </label>
@@ -410,27 +514,40 @@ const Signup = () => {
                   <p className="text-xs text-secondary mt-1.5">
                     Public registrations are created as Admin accounts.
                   </p>
+
                 </div>
 
+
                 {/* Business */}
-                <Select
-                  label="Business"
-                  name="business"
-                  value={form.business}
-                  onChange={handleChange}
-                  options={businessOptions}
-                  placeholder={
-                    isLoadingBusinesses
-                      ? "Loading businesses..."
-                      : "Select business"
-                  }
-                  disabled={isLoadingBusinesses || isSigningUp}
-                  error={errors.business}
-                  required
-                />
+
+                <div className="w-full">
+
+                  <Select
+                    label="Business"
+                    name="business"
+                    value={form.business}
+                    onChange={handleChange}
+                    options={businessOptions}
+                    placeholder={
+                      isLoadingBusinesses
+                        ? "Loading businesses..."
+                        : "Select business"
+                    }
+                    disabled={
+                      isLoadingBusinesses ||
+                      isSigningUp
+                    }
+                    error={errors.business}
+                    required
+                  />
+
+                </div>
+
 
                 {/* Business Type */}
-                <div className="md:col-span-2">
+
+                <div className="w-full md:col-span-2">
+
                   <Select
                     label="Business Type"
                     name="businessType"
@@ -457,6 +574,7 @@ const Signup = () => {
                     required
                   />
 
+
                   {form.business &&
                     businessTypeOptions.length > 0 && (
                       <p className="text-xs text-secondary mt-1.5">
@@ -464,21 +582,37 @@ const Signup = () => {
                         business are shown.
                       </p>
                     )}
+
                 </div>
+
               </div>
+
             </div>
 
-            {/* Account Information */}
-            <div className="rounded-xl border border-primary bg-surface px-4 py-3">
+
+            {/* =====================================================
+                ACCOUNT INFORMATION
+            ===================================================== */}
+
+            <div className="w-full rounded-xl border border-primary bg-surface px-4 py-3">
+
               <p className="text-sm text-secondary leading-6">
+
                 Your account will be registered with the{" "}
                 <strong>Admin</strong> role. The account will remain{" "}
                 <strong>pending</strong> until it is approved.
+
               </p>
+
             </div>
 
-            {/* Submit */}
-            <div className="pt-1">
+
+            {/* =====================================================
+                SUBMIT
+            ===================================================== */}
+
+            <div className="w-full pt-1">
+
               <Button
                 type="submit"
                 className="w-full"
@@ -488,12 +622,20 @@ const Signup = () => {
                   ? "Creating Account..."
                   : "Create Account"}
               </Button>
+
             </div>
 
-            {/* Login */}
-            <div className="text-center">
+
+            {/* =====================================================
+                LOGIN
+            ===================================================== */}
+
+            <div className="w-full text-center pb-1">
+
               <p className="text-sm text-secondary">
+
                 Already have an account?{" "}
+
                 <button
                   type="button"
                   onClick={() => navigate("/login")}
@@ -501,13 +643,20 @@ const Signup = () => {
                 >
                   Login
                 </button>
+
               </p>
+
             </div>
+
           </form>
+
         </div>
+
       </div>
+
     </div>
   );
 };
+
 
 export default Signup;
