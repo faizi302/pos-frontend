@@ -36,6 +36,16 @@ import SaleItems from "./pages/sales/SaleItems";
 import Customer from "./pages/customer/Customer";
 import CustomerForm from "./pages/customer/CustomerForm";
 
+import Expense from "./pages/expense/Expense";
+import CreateExpense from "./pages/expense/CreateExpense";
+// import EditExpense from "./pages/expense/EditExpense";
+import ExpenseDetails from "./pages/expense/ExpenseDetails";
+
+import ExpenseCategory from "./pages/expense/ExpenseCategory";
+import CreateExpenseCategory from "./pages/expense/CreateExpenseCategory";
+// import EditExpenseCategory from "./pages/expense/EditExpenseCategory";
+// import ExpenseCategoryDetails from "./pages/expense/ExpenseCategoryDetails";
+
 import CreateManager from "./pages/users/CreateManager";
 import UserDetails from "./pages/users/UserDetails";
 import EditAdmin from "./pages/users/EditAdmin";
@@ -346,6 +356,79 @@ export default function App() {
               </PermissionRoute>
             }
           />
+          {/* ===================== EXPENSES ===================== */}
+          <Route
+            path="/expense"
+            element={
+              <PermissionRoute permission="expenses.read">
+                <Expense />
+              </PermissionRoute>
+            }
+          />
+
+          <Route
+            path="/expenses/create"
+            element={
+              <PermissionRoute permission="expenses.create">
+                <CreateExpense />
+              </PermissionRoute>
+            }
+          />
+
+           <Route
+            path="/expenses/:id"
+            element={
+              <PermissionRoute permission="expenses.read">
+                <ExpenseDetails />
+              </PermissionRoute>
+            }
+          />
+
+          {/* <Route
+            path="/expenses/:id/edit"
+            element={
+              <PermissionRoute permission="expenses.update">
+                <EditExpense />
+              </PermissionRoute>
+            }
+          />  */}
+
+          {/* ===================== EXPENSE CATEGORIES ===================== */}
+          <Route
+            path="/expense-cat"
+            element={
+              <PermissionRoute permission="expense-categories.read">
+                <ExpenseCategory />
+              </PermissionRoute>
+            }
+          />
+
+          <Route
+            path="/expense-categories/create"
+            element={
+              <PermissionRoute permission="expense-categories.create">
+                <CreateExpenseCategory />
+              </PermissionRoute>
+            }
+          />
+
+          {/* <Route
+            path="/expense-categories/:id"
+            element={
+              <PermissionRoute permission="expense-categories.read">
+                <ExpenseCategoryDetails />
+              </PermissionRoute>
+            }
+          />
+
+          <Route
+            path="/expense-categories/:id/edit"
+            element={
+              <PermissionRoute permission="expense-categories.update">
+                <EditExpenseCategory />
+              </PermissionRoute>
+            } */}
+          {/* /> */}
 
           <Route path="/settings/account" element={<Account />} />
           <Route path="/settings/theme" element={<ThemeSettings />} />

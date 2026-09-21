@@ -252,20 +252,20 @@ export const sidebarConfig = [
 
   {
     title: "Expenses",
-    path: "/expenses",
+    path: "/expense",
     icon: WalletCards,
     section: "Finance",
     roles: ["admin", "manager"],
-    comingSoon: true,
+    comingSoon: false,
   },
 
   {
     title: "Expense Categories",
-    path: "/expense-categories",
+    path: "/expense-cat",
     icon: FolderTree,
     section: "Finance",
     roles: ["admin", "manager"],
-    comingSoon: true,
+    comingSoon: false,
   },
 
   {

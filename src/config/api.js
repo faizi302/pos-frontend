@@ -37,4 +37,8 @@ export const API_ROUTES = {
   salePayments: "/sale-payment",
 
    payments: "/payment",
+
+  // Expenses
+  expenses: "/expense",
+  expenseCategories: "/expense-cat",
 };
