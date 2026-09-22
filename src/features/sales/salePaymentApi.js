@@ -3,6 +3,9 @@ import { API_ROUTES } from "@/config/api";
 
 export const salePaymentApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    // =====================================================
+    // CREATE SALE PAYMENT
+    // =====================================================
     createSalePayment: builder.mutation({
       query: (data) => ({
         url: API_ROUTES.salePayments,
@@ -12,6 +15,9 @@ export const salePaymentApi = baseApi.injectEndpoints({
       invalidatesTags: ["SalePayment", "Sale"],
     }),
 
+    // =====================================================
+    // GET ALL SALE PAYMENTS
+    // =====================================================
     getAllSalePayments: builder.query({
       query: (params = {}) => ({
         url: API_ROUTES.salePayments,
@@ -21,6 +27,9 @@ export const salePaymentApi = baseApi.injectEndpoints({
       providesTags: ["SalePayment"],
     }),
 
+    // =====================================================
+    // GET PAYMENTS BY SALE
+    // =====================================================
     getSalePaymentsBySale: builder.query({
       query: (saleId) => ({
         url: `${API_ROUTES.salePayments}/sale/${saleId}`,
@@ -32,6 +41,9 @@ export const salePaymentApi = baseApi.injectEndpoints({
       ],
     }),
 
+    // =====================================================
+    // GET PAYMENT BY ID
+    // =====================================================
     getSalePaymentById: builder.query({
       query: (id) => ({
         url: `${API_ROUTES.salePayments}/${id}`,
@@ -42,6 +54,9 @@ export const salePaymentApi = baseApi.injectEndpoints({
       ],
     }),
 
+    // =====================================================
+    // UPDATE SALE PAYMENT
+    // =====================================================
     updateSalePayment: builder.mutation({
       query: ({ id, ...data }) => ({
         url: `${API_ROUTES.salePayments}/${id}`,
@@ -51,6 +66,9 @@ export const salePaymentApi = baseApi.injectEndpoints({
       invalidatesTags: ["SalePayment", "Sale"],
     }),
 
+    // =====================================================
+    // CANCEL SALE PAYMENT
+    // =====================================================
     cancelSalePayment: builder.mutation({
       query: (id) => ({
         url: `${API_ROUTES.salePayments}/${id}/cancel`,
@@ -59,6 +77,9 @@ export const salePaymentApi = baseApi.injectEndpoints({
       invalidatesTags: ["SalePayment", "Sale"],
     }),
 
+    // =====================================================
+    // DELETE SALE PAYMENT (blocked on backend)
+    // =====================================================
     deleteSalePayment: builder.mutation({
       query: (id) => ({
         url: `${API_ROUTES.salePayments}/${id}`,
@@ -67,6 +88,7 @@ export const salePaymentApi = baseApi.injectEndpoints({
       invalidatesTags: ["SalePayment", "Sale"],
     }),
   }),
+  overrideExisting: false,
 });
 
 export const {

@@ -14,6 +14,8 @@ import {
   CheckCircle,
   XCircle,
   Eye,
+  Hash,
+  Smartphone,
 } from "lucide-react";
 
 import PageHeader from "@/components/common/PageHeader";
@@ -31,6 +33,16 @@ import { useGetProductsQuery } from "../../features/products/productApi";
 // ======================================================
 // HELPERS
 // ======================================================
+
+const toTitleCase = (str = "") => {
+  if (!str || typeof str !== "string") return "";
+  return str
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
 
 const getProductName = (product) => product?.name || "Unknown Product";
 const getProductSku = (product) => product?.sku || "—";
@@ -110,7 +122,7 @@ export default function ProductInventory() {
   const { data: productResponse, isLoading: productsLoading } =
     useGetProductsQuery({
       page: 1,
-      limit: 100,
+      limit: 200,
       isActive: true,
     });
 
@@ -123,7 +135,7 @@ export default function ProductInventory() {
   const [deleteProductInventory, { isLoading: isDeleting }] =
     useDeleteProductInventoryMutation();
 
-  // API shape: { success, message, data: { inventory, pagination } }
+  // Normalize inventory data
   const inventory = useMemo(() => {
     if (Array.isArray(inventoryResponse?.data?.inventory)) {
       return inventoryResponse.data.inventory;
@@ -178,7 +190,9 @@ export default function ProductInventory() {
         getProductBrand(product).toLowerCase().includes(value) ||
         getProductModel(product).toLowerCase().includes(value) ||
         String(item.color || "").toLowerCase().includes(value) ||
-        String(item.size || "").toLowerCase().includes(value)
+        String(item.size || "").toLowerCase().includes(value) ||
+        String(item.imei || "").toLowerCase().includes(value) ||
+        String(item.unitBarcode || "").toLowerCase().includes(value)
       );
     });
   }, [inventory, search]);
@@ -256,11 +270,11 @@ export default function ProductInventory() {
 
   return (
     <div className="animate-fade-up min-w-0 space-y-6">
-      {/* HEADER + ADD BUTTON (always visible) */}
+      {/* HEADER */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
           title="Product Inventory"
-          description="Manage product stock, variants, pricing and inventory levels."
+          description="Manage product stock, variants, IMEI, pricing and inventory levels."
         />
 
         <Button
@@ -273,7 +287,7 @@ export default function ProductInventory() {
         </Button>
       </div>
 
-      {/* SUMMARY */}
+      {/* SUMMARY CARDS */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Total Inventory"
@@ -308,7 +322,7 @@ export default function ProductInventory() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search product, SKU, brand..."
+              placeholder="Search product, SKU, IMEI, barcode..."
               className="h-11 w-full rounded-xl border border-primary bg-surface pl-10 pr-4 text-sm text-primary outline-none transition focus:border-brand"
             />
           </div>
@@ -346,7 +360,7 @@ export default function ProductInventory() {
       {/* TABLE */}
       <div className="min-w-0 overflow-hidden rounded-2xl border border-primary bg-card shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] text-sm">
+          <table className="w-full min-w-[1200px] text-sm">
             <thead className="border-b border-secondary bg-surface">
               <tr>
                 <th className="px-5 py-4 text-left font-semibold text-primary">
@@ -356,7 +370,7 @@ export default function ProductInventory() {
                   SKU
                 </th>
                 <th className="px-5 py-4 text-left font-semibold text-primary">
-                  Variant
+                  Variant / IMEI
                 </th>
                 <th className="px-5 py-4 text-left font-semibold text-primary">
                   Quantity
@@ -389,7 +403,7 @@ export default function ProductInventory() {
                       </h3>
                       <p className="mt-1 max-w-sm text-sm text-secondary">
                         Add inventory for one of your products to start managing
-                        stock.
+                        stock and IMEI units.
                       </p>
                       <Button
                         type="button"
@@ -407,6 +421,7 @@ export default function ProductInventory() {
                   const status = getStockStatus(item);
                   const StatusIcon = status.icon;
                   const product = item.product;
+                  const isSerial = Boolean(item.imei || product?.trackSerial);
 
                   return (
                     <tr
@@ -414,9 +429,15 @@ export default function ProductInventory() {
                       className="transition hover:bg-surface"
                     >
                       <td className="px-5 py-4">
-                        <p className="max-w-[260px] truncate font-semibold text-primary">
+                        <p className="max-w-[240px] truncate font-semibold text-primary">
                           {getProductName(product)}
                         </p>
+                        {isSerial && (
+                          <span className="mt-1 inline-flex items-center gap-1 text-xs text-brand">
+                            <Smartphone size={12} />
+                            Serial
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-5 py-4">
@@ -426,21 +447,35 @@ export default function ProductInventory() {
                       </td>
 
                       <td className="px-5 py-4">
-                        {item.color || item.size ? (
+                        {item.imei ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <Hash size={13} className="text-secondary" />
+                              <span className="font-mono text-xs font-medium text-primary">
+                                {item.imei}
+                              </span>
+                            </div>
+                            {item.unitBarcode && (
+                              <p className="text-xs text-secondary">
+                                Barcode: {item.unitBarcode}
+                              </p>
+                            )}
+                          </div>
+                        ) : item.color || item.size ? (
                           <div className="flex max-w-[220px] flex-wrap gap-1.5">
                             {item.color && (
                               <span className="rounded-lg border border-primary bg-surface px-2.5 py-1 text-xs text-primary">
-                                Color: {item.color}
+                                {item.color}
                               </span>
                             )}
                             {item.size && (
                               <span className="rounded-lg border border-primary bg-surface px-2.5 py-1 text-xs text-primary">
-                                Size: {item.size}
+                                {item.size}
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-secondary">No Variant</span>
+                          <span className="text-secondary">—</span>
                         )}
                       </td>
 
@@ -600,6 +635,8 @@ function InventoryForm({
     product: inventory?.product?._id || inventory?.product || "",
     color: inventory?.color || "",
     size: inventory?.size || "",
+    imei: inventory?.imei || "",
+    unitBarcode: inventory?.unitBarcode || "",
     quantity: inventory?.quantity ?? 0,
     minStock: inventory?.minStock ?? 0,
     maxStock: inventory?.maxStock ?? "",
@@ -617,6 +654,7 @@ function InventoryForm({
   }, [products, form.product, isEdit, inventory]);
 
   const hasVariants = selectedProduct?.hasVariants === true;
+  const trackSerial = selectedProduct?.trackSerial === true;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -634,6 +672,9 @@ function InventoryForm({
       salePrice: product?.salePrice ?? "",
       color: "",
       size: "",
+      imei: "",
+      unitBarcode: "",
+      quantity: product?.trackSerial ? 1 : 0,
     }));
   };
 
@@ -645,8 +686,18 @@ function InventoryForm({
       return;
     }
 
+    if (trackSerial && !form.imei.trim()) {
+      toast.error("IMEI number is required for serial products.");
+      return;
+    }
+
     if (form.quantity === "" || Number(form.quantity) < 0) {
       toast.error("Please enter a valid quantity.");
+      return;
+    }
+
+    if (trackSerial && Number(form.quantity) !== 1) {
+      toast.error("Serial / IMEI products must have quantity = 1.");
       return;
     }
 
@@ -685,9 +736,11 @@ function InventoryForm({
 
     const payload = {
       product: form.product,
-      color: hasVariants ? form.color.trim() || null : null,
-      size: hasVariants ? form.size.trim() || null : null,
-      quantity: Number(form.quantity),
+      color: hasVariants ? toTitleCase(form.color) || null : null,
+      size: hasVariants ? toTitleCase(form.size) || null : null,
+      imei: trackSerial ? form.imei.trim().toUpperCase() || null : null,
+      unitBarcode: form.unitBarcode.trim().toUpperCase() || null,
+      quantity: trackSerial ? 1 : Number(form.quantity),
       minStock: Number(form.minStock),
       maxStock: form.maxStock === "" ? null : Number(form.maxStock),
       purchasePrice:
@@ -710,8 +763,8 @@ function InventoryForm({
             </h2>
             <p className="mt-1 text-xs text-secondary sm:text-sm">
               {isEdit
-                ? "Update stock and pricing information."
-                : "Add stock and pricing information for a product."}
+                ? "Update stock, IMEI and pricing information."
+                : "Add stock, IMEI and pricing information for a product."}
             </p>
           </div>
           <button
@@ -726,6 +779,7 @@ function InventoryForm({
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <form onSubmit={handleSubmit} className="space-y-6 p-4 sm:p-6">
+            {/* PRODUCT SELECT */}
             <div>
               <label className="mb-2 block text-sm font-medium text-primary">
                 Product
@@ -744,6 +798,7 @@ function InventoryForm({
                 {products.map((product) => (
                   <option key={product._id} value={product._id}>
                     {getProductName(product)} — {getProductSku(product)}
+                    {product.trackSerial ? " (Serial)" : ""}
                   </option>
                 ))}
               </select>
@@ -764,11 +819,49 @@ function InventoryForm({
                       value={getProductModel(selectedProduct)}
                     />
                   </div>
+                  {trackSerial && (
+                    <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand">
+                      <Smartphone size={14} />
+                      This product uses serial / IMEI tracking
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
-            {hasVariants && (
+            {/* SERIAL / IMEI FIELDS */}
+            {trackSerial && (
+              <div>
+                <div className="mb-3">
+                  <h3 className="font-semibold text-primary">
+                    Serial / IMEI Information
+                  </h3>
+                  <p className="text-xs text-secondary">
+                    Each unit must have a unique IMEI number.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormField
+                    label="IMEI Number"
+                    name="imei"
+                    value={form.imei}
+                    onChange={handleChange}
+                    placeholder="e.g. 356938035643809"
+                    required
+                  />
+                  <FormField
+                    label="Unit Barcode (Optional)"
+                    name="unitBarcode"
+                    value={form.unitBarcode}
+                    onChange={handleChange}
+                    placeholder="Optional unit barcode"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* VARIANT FIELDS (only if not serial) */}
+            {hasVariants && !trackSerial && (
               <div>
                 <div className="mb-3">
                   <h3 className="font-semibold text-primary">Product Variant</h3>
@@ -795,11 +888,14 @@ function InventoryForm({
               </div>
             )}
 
+            {/* STOCK */}
             <div>
               <div className="mb-3">
                 <h3 className="font-semibold text-primary">Stock Information</h3>
                 <p className="text-xs text-secondary">
-                  Configure current and stock-limit values.
+                  {trackSerial
+                    ? "Serial products always have quantity = 1."
+                    : "Configure current and stock-limit values."}
                 </p>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -808,9 +904,10 @@ function InventoryForm({
                   name="quantity"
                   type="number"
                   min="0"
-                  value={form.quantity}
+                  value={trackSerial ? 1 : form.quantity}
                   onChange={handleChange}
                   required
+                  disabled={trackSerial}
                 />
                 <FormField
                   label="Minimum Stock"
@@ -832,6 +929,7 @@ function InventoryForm({
               </div>
             </div>
 
+            {/* PRICING */}
             <div>
               <div className="mb-3">
                 <h3 className="font-semibold text-primary">Pricing</h3>
@@ -880,6 +978,7 @@ function InventoryForm({
               </div>
             </div>
 
+            {/* ACTIONS */}
             <div className="flex flex-col-reverse gap-3 border-t border-secondary pt-5 sm:flex-row sm:justify-end">
               <Button
                 type="button"
@@ -926,6 +1025,7 @@ function FormField({
   min,
   max,
   step,
+  disabled = false,
 }) {
   return (
     <div className="min-w-0">
@@ -945,7 +1045,8 @@ function FormField({
         min={min}
         max={max}
         step={step}
-        className="h-11 w-full rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none transition focus:border-brand"
+        disabled={disabled}
+        className="h-11 w-full rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none transition focus:border-brand disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );
@@ -964,6 +1065,10 @@ function InfoItem({ label, value }) {
     </div>
   );
 }
+
+// ======================================================
+// DETAILS MODAL
+// ======================================================
 
 function InventoryDetails({ inventory, onClose, onEdit }) {
   const product = inventory?.product;
@@ -999,13 +1104,21 @@ function InventoryDetails({ inventory, onClose, onEdit }) {
             <DetailItem label="SKU" value={getProductSku(product)} />
             <DetailItem label="Brand" value={getProductBrand(product)} />
             <DetailItem label="Model" value={getProductModel(product)} />
+
+            {inventory.imei && (
+              <DetailItem label="IMEI" value={inventory.imei} />
+            )}
+            {inventory.unitBarcode && (
+              <DetailItem label="Unit Barcode" value={inventory.unitBarcode} />
+            )}
+
             <DetailItem
               label="Color"
-              value={inventory.color || "No Variant"}
+              value={inventory.color || "—"}
             />
             <DetailItem
               label="Size"
-              value={inventory.size || "No Variant"}
+              value={inventory.size || "—"}
             />
             <DetailItem label="Quantity" value={inventory.quantity} />
             <DetailItem label="Minimum Stock" value={inventory.minStock} />

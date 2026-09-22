@@ -5,6 +5,7 @@ export const brandsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // =====================================================
     // GET ALL BRANDS
+    // GET /api/brands?search=&isActive=&business=&businessType=&tenantOwner=
     // =====================================================
     getBrands: builder.query({
       query: (params = {}) => ({
@@ -12,16 +13,13 @@ export const brandsApi = baseApi.injectEndpoints({
         method: "GET",
         params,
       }),
-
-      transformResponse: (response) => response.data,
-
+      transformResponse: (response) => response?.data ?? response,
       providesTags: (result) =>
         result
           ? [
-              ...result.map((brand) => ({
-                type: "Brand",
-                id: brand._id,
-              })),
+              ...(Array.isArray(result)
+                ? result.map((b) => ({ type: "Brand", id: b._id }))
+                : []),
               { type: "Brand", id: "LIST" },
             ]
           : [{ type: "Brand", id: "LIST" }],
@@ -29,109 +27,104 @@ export const brandsApi = baseApi.injectEndpoints({
 
     // =====================================================
     // GET BRANDS BY BUSINESS TYPE
+    // GET /api/brands/business-type/:businessTypeId
     // =====================================================
     getBrandsByBusinessType: builder.query({
-      query: (businessTypeId) =>
-        `${API_ROUTES.brands}/business-type/${businessTypeId}`,
-
-      transformResponse: (response) => response.data,
-
+      query: (businessTypeId) => ({
+        url: `${API_ROUTES.brands}/business-type/${businessTypeId}`,
+        method: "GET",
+      }),
+      transformResponse: (response) => response?.data ?? response,
       providesTags: (result, error, businessTypeId) =>
         result
           ? [
-              ...result.map((brand) => ({
-                type: "Brand",
-                id: brand._id,
-              })),
-              {
-                type: "Brand",
-                id: `BUSINESS_TYPE_${businessTypeId}`,
-              },
+              ...(Array.isArray(result)
+                ? result.map((b) => ({ type: "Brand", id: b._id }))
+                : []),
+              { type: "Brand", id: `BUSINESS_TYPE_${businessTypeId}` },
+              { type: "Brand", id: "LIST" },
             ]
           : [
-              {
-                type: "Brand",
-                id: `BUSINESS_TYPE_${businessTypeId}`,
-              },
+              { type: "Brand", id: `BUSINESS_TYPE_${businessTypeId}` },
+              { type: "Brand", id: "LIST" },
             ],
     }),
 
     // =====================================================
     // GET BRAND BY ID
+    // GET /api/brands/:id
     // =====================================================
     getBrandById: builder.query({
-      query: (id) => `${API_ROUTES.brands}/${id}`,
-
-      transformResponse: (response) => response.data,
-
-      providesTags: (result, error, id) => [
-        {
-          type: "Brand",
-          id,
-        },
-      ],
+      query: (id) => ({
+        url: `${API_ROUTES.brands}/${id}`,
+        method: "GET",
+      }),
+      transformResponse: (response) => response?.data ?? response,
+      providesTags: (result, error, id) => [{ type: "Brand", id }],
     }),
 
     // =====================================================
     // CREATE BRAND
+    // POST /api/brands
+    // Admin body: { name, description?, isActive? }
+    // Super Admin body: + business, businessType, tenantOwner
     // =====================================================
     createBrand: builder.mutation({
       query: (body) => ({
         url: API_ROUTES.brands,
         method: "POST",
         body,
-        headers: {
-          "Content-Type": "application/json",
-        },
       }),
-
       invalidatesTags: [
         { type: "Brand", id: "LIST" },
+        // business-type lists refresh after create
+        { type: "Brand" },
       ],
     }),
 
     // =====================================================
     // UPDATE BRAND
+    // PUT /api/brands/:id
     // =====================================================
     updateBrand: builder.mutation({
       query: ({ id, ...body }) => ({
         url: `${API_ROUTES.brands}/${id}`,
         method: "PUT",
         body,
-        headers: {
-          "Content-Type": "application/json",
-        },
       }),
-
       invalidatesTags: (result, error, { id }) => [
         { type: "Brand", id },
         { type: "Brand", id: "LIST" },
+        { type: "Brand" },
       ],
     }),
 
     // =====================================================
     // DELETE BRAND
+    // DELETE /api/brands/:id
     // =====================================================
     deleteBrand: builder.mutation({
       query: (id) => ({
         url: `${API_ROUTES.brands}/${id}`,
         method: "DELETE",
       }),
-
       invalidatesTags: (result, error, id) => [
         { type: "Brand", id },
         { type: "Brand", id: "LIST" },
+        { type: "Brand" },
       ],
     }),
   }),
-
   overrideExisting: false,
 });
 
 export const {
   useGetBrandsQuery,
+  useLazyGetBrandsQuery,
   useGetBrandsByBusinessTypeQuery,
+  useLazyGetBrandsByBusinessTypeQuery,
   useGetBrandByIdQuery,
+  useLazyGetBrandByIdQuery,
   useCreateBrandMutation,
   useUpdateBrandMutation,
   useDeleteBrandMutation,

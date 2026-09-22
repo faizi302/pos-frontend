@@ -5,7 +5,8 @@ export const productsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // ==================================================
     // GET ALL PRODUCTS
-    // GET /api/products
+    // GET /api/products?page&limit&search&category&brand&model&productType&isActive&trackSerial&stockStatus
+    // Response data: { products, pagination }
     // ==================================================
     getProducts: builder.query({
       query: (params = {}) => ({
@@ -13,132 +14,89 @@ export const productsApi = baseApi.injectEndpoints({
         method: "GET",
         params,
       }),
-
-      transformResponse: (response) => response.data,
-
-      providesTags: (result) =>
-        result?.products
-          ? [
-              ...result.products.map((product) => ({
-                type: "Product",
-                id: product._id,
-              })),
-              { type: "Product", id: "LIST" },
-            ]
-          : [{ type: "Product", id: "LIST" }],
+      transformResponse: (response) => response?.data ?? response,
+      providesTags: (result) => {
+        const list = result?.products;
+        if (Array.isArray(list)) {
+          return [
+            ...list.map((p) => ({ type: "Product", id: p._id })),
+            { type: "Product", id: "LIST" },
+          ];
+        }
+        return [{ type: "Product", id: "LIST" }];
+      },
     }),
 
     // ==================================================
     // GET PRODUCT BY ID
     // GET /api/products/:id
+    // Accepts: id string  OR  { id, business?, businessType? }
     // ==================================================
     getProductById: builder.query({
-      query: ({ id, business, businessType } = {}) => {
+      query: (arg) => {
+        const id = typeof arg === "string" ? arg : arg?.id;
         const params = {};
-
-        if (business) {
-          params.business = business;
+        if (typeof arg === "object" && arg) {
+          if (arg.business) params.business = arg.business;
+          if (arg.businessType) params.businessType = arg.businessType;
         }
-
-        if (businessType) {
-          params.businessType = businessType;
-        }
-
         return {
           url: `${API_ROUTES.products}/${id}`,
           method: "GET",
-          params:
-            Object.keys(params).length > 0
-              ? params
-              : undefined,
+          params: Object.keys(params).length ? params : undefined,
         };
       },
-
-      transformResponse: (response) => response.data,
-
-      providesTags: (result, error, { id }) => [
-        { type: "Product", id },
-      ],
+      transformResponse: (response) => response?.data ?? response,
+      providesTags: (result, error, arg) => {
+        const id = typeof arg === "string" ? arg : arg?.id;
+        return [{ type: "Product", id }];
+      },
     }),
 
     // ==================================================
     // CREATE PRODUCT
-    // POST /api/products
-    //
-    // Supports:
-    // - Product fields
-    // - Multiple images
-    // - FormData
+    // POST /api/products  (JSON or FormData with field "images")
+    // Admin body: category, brand, model?, name?, sku, salePrice, ...
+    // Super Admin may also send tenantOwner / business / businessType
     // ==================================================
     createProduct: builder.mutation({
       query: (body) => {
         const isFormData =
-          typeof FormData !== "undefined" &&
-          body instanceof FormData;
-
+          typeof FormData !== "undefined" && body instanceof FormData;
         return {
           url: API_ROUTES.products,
           method: "POST",
           body,
-
-          // IMPORTANT:
-          // Never manually set Content-Type for FormData.
-          // Browser automatically adds:
-          //
-          // multipart/form-data; boundary=...
-          //
+          // Let the browser set multipart boundary for FormData
           ...(isFormData
             ? {}
-            : {
-                headers: {
-                  "Content-Type": "application/json",
-                },
-              }),
+            : { headers: { "Content-Type": "application/json" } }),
         };
       },
-
-      transformResponse: (response) => response.data,
-
-      invalidatesTags: [
-        { type: "Product", id: "LIST" },
-      ],
+      transformResponse: (response) => response?.data ?? response,
+      invalidatesTags: [{ type: "Product", id: "LIST" }],
     }),
 
     // ==================================================
     // UPDATE PRODUCT
     // PATCH /api/products/:id
-    //
-    // Supports:
-    // - Product field updates
-    // - Brand / model / category changes
-    // - Price changes
-    // - Boolean fields
-    // - Add images
-    // - Remove images
+    // Arg: { id, body } where body is JSON object or FormData
+    // FormData may include "images" and "removeImages"
     // ==================================================
     updateProduct: builder.mutation({
       query: ({ id, body }) => {
         const isFormData =
-          typeof FormData !== "undefined" &&
-          body instanceof FormData;
-
+          typeof FormData !== "undefined" && body instanceof FormData;
         return {
           url: `${API_ROUTES.products}/${id}`,
           method: "PATCH",
           body,
-
           ...(isFormData
             ? {}
-            : {
-                headers: {
-                  "Content-Type": "application/json",
-                },
-              }),
+            : { headers: { "Content-Type": "application/json" } }),
         };
       },
-
-      transformResponse: (response) => response.data,
-
+      transformResponse: (response) => response?.data ?? response,
       invalidatesTags: (result, error, { id }) => [
         { type: "Product", id },
         { type: "Product", id: "LIST" },
@@ -146,19 +104,14 @@ export const productsApi = baseApi.injectEndpoints({
     }),
 
     // ==================================================
-    // DELETE PRODUCT
+    // DELETE PRODUCT (soft — isActive: false)
     // DELETE /api/products/:id
-    //
-    // Backend performs SOFT DELETE:
-    // - Product -> isActive = false
-    // - Inventory -> isActive = false
     // ==================================================
     deleteProduct: builder.mutation({
       query: (id) => ({
         url: `${API_ROUTES.products}/${id}`,
         method: "DELETE",
       }),
-
       invalidatesTags: (result, error, id) => [
         { type: "Product", id },
         { type: "Product", id: "LIST" },
@@ -168,34 +121,27 @@ export const productsApi = baseApi.injectEndpoints({
     // ==================================================
     // RESTORE PRODUCT
     // PATCH /api/products/:id/restore
-    //
-    // Backend restores:
-    // - Product
-    // - Product inventory
     // ==================================================
     restoreProduct: builder.mutation({
       query: (id) => ({
         url: `${API_ROUTES.products}/${id}/restore`,
         method: "PATCH",
       }),
-
-      transformResponse: (response) => response.data,
-
+      transformResponse: (response) => response?.data ?? response,
       invalidatesTags: (result, error, id) => [
         { type: "Product", id },
         { type: "Product", id: "LIST" },
       ],
     }),
   }),
+  overrideExisting: false,
 });
-
-// ======================================================
-// EXPORT HOOKS
-// ======================================================
 
 export const {
   useGetProductsQuery,
+  useLazyGetProductsQuery,
   useGetProductByIdQuery,
+  useLazyGetProductByIdQuery,
   useCreateProductMutation,
   useUpdateProductMutation,
   useDeleteProductMutation,

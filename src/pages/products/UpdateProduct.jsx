@@ -12,36 +12,27 @@ import {
 
 import { TableSkeleton } from "@/components/common/LoadingSkeleton";
 import ErrorState from "@/components/common/ErrorState";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 export default function UpdateProduct() {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  // productApi transformResponse already unwraps response.data
+  // so `data` IS the product document (has _id, name, ...)
   const {
-    data,
+    data: product,
     isLoading,
     isError,
+    error,
     refetch,
-  } = useGetProductByIdQuery(
-    { id },
-    {
-      skip: !id,
-    }
-  );
+  } = useGetProductByIdQuery(id, {
+    skip: !id,
+  });
 
-  const [
-    updateProduct,
-    { isLoading: isSubmitting },
-  ] = useUpdateProductMutation();
+  const [updateProduct, { isLoading: isSubmitting }] =
+    useUpdateProductMutation();
 
-  // ======================================================
-  // SUBMIT
-  // ======================================================
-  //
-  // ProductForm builds and passes a FormData instance
-  // (fields + images) — we just forward it to the API
-  // along with the product id.
-  //
   const handleSubmit = async (formData) => {
     try {
       await updateProduct({
@@ -50,11 +41,11 @@ export default function UpdateProduct() {
       }).unwrap();
 
       toast.success("Product updated successfully.");
-
       navigate("/products");
-    } catch (error) {
+    } catch (err) {
       toast.error(
-        error?.data?.message ||
+        getApiErrorMessage(err) ||
+          err?.data?.message ||
           "Failed to update product."
       );
     }
@@ -72,13 +63,13 @@ export default function UpdateProduct() {
           description="Update product information."
           icon={Package}
         />
-
         <TableSkeleton cols={2} />
       </div>
     );
   }
 
-  if (isError || !data?.product) {
+  // Product is the document itself — check _id, not data.product
+  if (isError || !product?._id) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -86,10 +77,13 @@ export default function UpdateProduct() {
           description="Update product information."
           icon={Package}
         />
-
         <ErrorState
           onRetry={refetch}
-          description="Unable to load product."
+          description={
+            error?.data?.message ||
+            getApiErrorMessage(error) ||
+            "Unable to load product."
+          }
         />
       </div>
     );
@@ -99,16 +93,12 @@ export default function UpdateProduct() {
     <div className="space-y-6">
       <PageHeader
         title="Edit Product"
-        description={`Update ${data.product.name || "product"} information.`}
+        description={`Update ${product.name || "product"} information.`}
         icon={Package}
       />
 
-      {/*
-        ProductForm reads `initialValues` (not `product`) and
-        infers edit mode from `initialValues._id` being present.
-      */}
       <ProductForm
-        initialValues={data.product}
+        initialValues={product}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isSubmitting={isSubmitting}

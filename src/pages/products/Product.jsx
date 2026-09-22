@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
-
 import {
   Plus,
   Pencil,
@@ -10,455 +9,326 @@ import {
   RotateCcw,
   Search,
   Package,
+  Smartphone,
+  RefreshCw,
+  X,
 } from "lucide-react";
 
 import PageHeader from "@/components/common/PageHeader";
 import Button from "@/components/ui/Button";
-import ConfirmModal from "../../components/modals/ConfirmModal";
+import ConfirmModal from "@/components/modals/ConfirmModal";
+
+import { usePermissions } from "@/hooks/usePermissions";
+import { getApiErrorMessage } from "@/utils/apiError";
 
 import {
   useGetProductsQuery,
   useDeleteProductMutation,
   useRestoreProductMutation,
-} from "../../features/products/productApi";
-
-
-// ======================================================
-// PERMISSIONS
-// ======================================================
+} from "@/features/products/productApi";
 
 const PERMISSIONS = {
   CREATE: "products.create",
-  READ: "products.read",
   UPDATE: "products.update",
   DELETE: "products.delete",
 };
 
+const formatMoney = (value) =>
+  `Rs ${Number(value || 0).toLocaleString("en-PK", {
+    maximumFractionDigits: 2,
+  })}`;
 
-// ======================================================
-// PRODUCT PAGE
-// ======================================================
+const toTitleCase = (value = "") =>
+  String(value)
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 
-const Product = () => {
+export default function Product() {
+  const { can } = usePermissions();
+  const canCreate = can(PERMISSIONS.CREATE);
+  const canUpdate = can(PERMISSIONS.UPDATE);
+  const canDelete = can(PERMISSIONS.DELETE);
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
 
-  const [deleteModal, setDeleteModal] = useState(null);
-  const [restoreModal, setRestoreModal] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
+  const [viewing, setViewing] = useState(null);
 
-  // ====================================================
-  // API
-  // ====================================================
+  const queryArgs = useMemo(() => {
+    const params = {
+      page,
+      limit: 20,
+    };
+    if (search.trim()) params.search = search.trim();
+    if (statusFilter === "active") params.isActive = true;
+    if (statusFilter === "inactive") params.isActive = false;
+    return params;
+  }, [page, search, statusFilter]);
 
   const {
     data,
     isLoading,
     isFetching,
+    isError,
     error,
-  } = useGetProductsQuery({
-    search: search || undefined,
-    status:
-      statusFilter === "all"
-        ? undefined
-        : statusFilter,
-  });
+    refetch,
+  } = useGetProductsQuery(queryArgs);
 
   const [deleteProduct, { isLoading: isDeleting }] =
     useDeleteProductMutation();
-
   const [restoreProduct, { isLoading: isRestoring }] =
     useRestoreProductMutation();
 
-
-  // ====================================================
-  // EXTRACT PRODUCTS
-  // ====================================================
-
   const products = useMemo(() => {
-    if (Array.isArray(data)) {
-      return data;
-    }
-
-    if (Array.isArray(data?.products)) {
-      return data.products;
-    }
-
-    if (Array.isArray(data?.data)) {
-      return data.data;
-    }
-
+    if (Array.isArray(data?.products)) return data.products;
+    if (Array.isArray(data?.data?.products)) return data.data.products;
+    if (Array.isArray(data)) return data;
     return [];
   }, [data]);
 
-
-  // ====================================================
-  // CLIENT SIDE FILTER
-  // ====================================================
-
-  const filteredProducts = useMemo(() => {
-    const searchValue = search.trim().toLowerCase();
-
-    return products.filter((product) => {
-      const matchesSearch =
-        !searchValue ||
-        product?.name
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        product?.sku
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        product?.barcode
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        product?.brand?.name
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        product?.model?.name
-          ?.toLowerCase()
-          .includes(searchValue);
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "active" &&
-          product?.isActive === true) ||
-        (statusFilter === "inactive" &&
-          product?.isActive === false);
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [products, search, statusFilter]);
-
-
-  // ====================================================
-  // DELETE
-  // ====================================================
-
-  const handleDelete = async () => {
-    if (!deleteModal?._id) return;
-
-    try {
-      await deleteProduct(deleteModal._id).unwrap();
-
-      toast.success("Product deleted successfully");
-
-      setDeleteModal(null);
-    } catch (error) {
-      toast.error(
-        error?.data?.message ||
-        error?.message ||
-        "Failed to delete product"
-      );
-    }
+  const pagination = data?.pagination || {
+    page: 1,
+    limit: 20,
+    total: products.length,
+    totalPages: 1,
   };
 
+  const activeCount = products.filter((p) => p.isActive).length;
+  const inactiveCount = products.filter((p) => !p.isActive).length;
+  const serialCount = products.filter((p) => p.trackSerial).length;
 
-  // ====================================================
-  // RESTORE
-  // ====================================================
-
-  const handleRestore = async () => {
-    if (!restoreModal?._id) return;
-
+  async function handleDelete() {
+    if (!deleteTarget?._id) return;
     try {
-      await restoreProduct(restoreModal._id).unwrap();
+      await deleteProduct(deleteTarget._id).unwrap();
+      toast.success("Product deactivated successfully");
+      setDeleteTarget(null);
+      if (viewing?._id === deleteTarget._id) setViewing(null);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err) || "Failed to deactivate product");
+    }
+  }
 
+  async function handleRestore() {
+    if (!restoreTarget?._id) return;
+    try {
+      await restoreProduct(restoreTarget._id).unwrap();
       toast.success("Product restored successfully");
-
-      setRestoreModal(null);
-    } catch (error) {
-      toast.error(
-        error?.data?.message ||
-        error?.message ||
-        "Failed to restore product"
-      );
+      setRestoreTarget(null);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err) || "Failed to restore product");
     }
-  };
-
-
-  // ====================================================
-  // LOADING
-  // ====================================================
+  }
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="animate-fade-up space-y-6">
         <PageHeader
           title="Products"
           description="Manage your products and inventory catalog."
         />
-
-        <div className="rounded-xl border border-border bg-background p-10 text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-current border-t-transparent" />
-
-          <p className="mt-4 text-sm text-muted-foreground">
-            Loading products...
-          </p>
+        <div className="rounded-2xl border border-primary bg-card p-16 text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+          <p className="mt-4 text-sm text-secondary">Loading products…</p>
         </div>
       </div>
     );
   }
 
-
-  // ====================================================
-  // ERROR
-  // ====================================================
-
-  if (error) {
+  if (isError) {
     return (
-      <div className="space-y-6">
+      <div className="animate-fade-up space-y-6">
         <PageHeader
           title="Products"
           description="Manage your products and inventory catalog."
         />
-
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900 dark:bg-red-950/30">
-          <Package className="mx-auto h-10 w-10 text-red-500" />
-
-          <h3 className="mt-3 text-lg font-semibold">
+        <div className="rounded-2xl border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/5 p-10 text-center">
+          <Package className="mx-auto h-10 w-10 text-[var(--color-danger)]" />
+          <h3 className="mt-3 text-lg font-semibold text-primary">
             Failed to load products
           </h3>
-
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-secondary">
             {error?.data?.message ||
-              "Something went wrong while loading products."}
+              getApiErrorMessage(error) ||
+              "Something went wrong."}
           </p>
+          <Button onClick={() => refetch()} className="mt-5">
+            Try again
+          </Button>
         </div>
       </div>
     );
   }
 
-
-  // ====================================================
-  // UI
-  // ====================================================
-
   return (
-    <div className="space-y-6">
-
-      {/* ==================================================
-          HEADER
-      ================================================== */}
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">
-            Products
-          </h1>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage products, pricing, brands, models and catalog information.
-          </p>
-        </div>
-
-        <Link to="/products/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
-        </Link>
+    <div className="animate-fade-up min-w-0 space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader
+          title="Products"
+          description="Manage products, pricing, brands, models and serial tracking."
+        />
+        {canCreate && (
+          <Link to="/products/create">
+            <Button className="inline-flex w-full items-center justify-center gap-2 sm:w-auto">
+              <Plus size={18} />
+              Add Product
+            </Button>
+          </Link>
+        )}
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard
+          title="Total (page)"
+          value={pagination.total ?? products.length}
+          icon={Package}
+        />
+        <SummaryCard title="Active (page)" value={activeCount} icon={Package} />
+        <SummaryCard
+          title="Inactive (page)"
+          value={inactiveCount}
+          icon={Package}
+        />
+        <SummaryCard
+          title="Serial / IMEI"
+          value={serialCount}
+          icon={Smartphone}
+        />
+      </div>
 
-      {/* ==================================================
-          FILTERS
-      ================================================== */}
-
-      <div className="rounded-xl border border-border bg-background p-4">
+      <div className="rounded-2xl border border-primary bg-card p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
-          {/* Search */}
-
           <div className="relative w-full lg:max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary"
+            />
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search product, SKU, barcode, brand..."
-              className="h-10 w-full rounded-lg border border-border bg-background pl-10 pr-4 text-sm outline-none transition focus:border-primary"
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search name, SKU, barcode…"
+              className="h-11 w-full rounded-xl border border-primary bg-surface pl-10 pr-4 text-sm text-primary outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
             />
           </div>
 
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="h-11 rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none focus:border-brand"
+            >
+              <option value="all">All status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
 
-          {/* Status */}
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-primary bg-surface px-4 text-sm font-medium text-primary transition hover:bg-muted-action"
+            >
+              <RefreshCw
+                size={17}
+                className={isFetching ? "animate-spin" : ""}
+              />
+              Refresh
+            </button>
 
-          <select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value)
-            }
-            className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary"
-          >
-            <option value="all">
-              All Status
-            </option>
-
-            <option value="active">
-              Active
-            </option>
-
-            <option value="inactive">
-              Inactive
-            </option>
-          </select>
-
-        </div>
-      </div>
-
-
-      {/* ==================================================
-          SUMMARY
-      ================================================== */}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-
-        <div className="rounded-xl border border-border bg-background p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Total Products
-              </p>
-
-              <h3 className="mt-2 text-2xl font-bold">
-                {products.length}
-              </h3>
-            </div>
-
-            <div className="rounded-lg bg-primary/10 p-3">
-              <Package className="h-5 w-5 text-primary" />
-            </div>
+            {canCreate && (
+              <Link to="/products/create" className="hidden sm:inline-flex">
+                <Button className="inline-flex h-11 items-center gap-2">
+                  <Plus size={17} />
+                  Add Product
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
-
-
-        <div className="rounded-xl border border-border bg-background p-5">
-          <p className="text-sm text-muted-foreground">
-            Active Products
-          </p>
-
-          <h3 className="mt-2 text-2xl font-bold">
-            {
-              products.filter(
-                (product) =>
-                  product?.isActive === true
-              ).length
-            }
-          </h3>
-        </div>
-
-
-        <div className="rounded-xl border border-border bg-background p-5">
-          <p className="text-sm text-muted-foreground">
-            Inactive Products
-          </p>
-
-          <h3 className="mt-2 text-2xl font-bold">
-            {
-              products.filter(
-                (product) =>
-                  product?.isActive === false
-              ).length
-            }
-          </h3>
-        </div>
-
       </div>
 
-
-      {/* ==================================================
-          TABLE
-      ================================================== */}
-
-      <div className="overflow-hidden rounded-xl border border-border bg-background">
-
+      <div
+        className={`min-w-0 overflow-hidden rounded-2xl border border-primary bg-card shadow-sm ${
+          isFetching ? "opacity-80" : ""
+        }`}
+      >
         <div className="overflow-x-auto">
-
-          <table className="w-full min-w-[1200px] text-sm">
-
-            <thead className="border-b border-border bg-muted/40">
-
+          <table className="w-full min-w-[1100px] text-sm">
+            <thead className="border-b border-secondary bg-surface">
               <tr>
-
-                <th className="px-4 py-3 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold text-primary">
                   Product
                 </th>
-
-                <th className="px-4 py-3 text-left font-semibold">
+                <th className="px-5 py-4 text-left font-semibold text-primary">
                   SKU
                 </th>
-
-                <th className="px-4 py-3 text-left font-semibold">
-                  Category
+                <th className="px-5 py-4 text-left font-semibold text-primary">
+                  Brand / Model
                 </th>
-
-                <th className="px-4 py-3 text-left font-semibold">
-                  Brand
+                <th className="px-5 py-4 text-left font-semibold text-primary">
+                  Type
                 </th>
-
-                <th className="px-4 py-3 text-left font-semibold">
-                  Model
-                </th>
-
-                <th className="px-4 py-3 text-right font-semibold">
+                <th className="px-5 py-4 text-right font-semibold text-primary">
                   Purchase
                 </th>
-
-                <th className="px-4 py-3 text-right font-semibold">
+                <th className="px-5 py-4 text-right font-semibold text-primary">
                   Sale
                 </th>
-
-                <th className="px-4 py-3 text-center font-semibold">
+                <th className="px-5 py-4 text-center font-semibold text-primary">
                   Status
                 </th>
-
-                <th className="px-4 py-3 text-right font-semibold">
+                <th className="px-5 py-4 text-right font-semibold text-primary">
                   Actions
                 </th>
-
               </tr>
-
             </thead>
 
-
-            <tbody className="divide-y divide-border">
-
-              {filteredProducts.length === 0 ? (
-
+            <tbody className="divide-y divide-[var(--border-secondary-color)]">
+              {products.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan="9"
-                    className="px-4 py-12 text-center"
-                  >
-                    <Package className="mx-auto h-10 w-10 text-muted-foreground" />
-
-                    <p className="mt-3 font-medium">
+                  <td colSpan={8} className="px-5 py-16 text-center">
+                    <Package
+                      size={42}
+                      className="mx-auto mb-3 text-secondary"
+                    />
+                    <h3 className="text-base font-semibold text-primary">
                       No products found
+                    </h3>
+                    <p className="mt-1 text-sm text-secondary">
+                      {search || statusFilter !== "all"
+                        ? "Try a different search or status filter."
+                        : "Create your first product to get started."}
                     </p>
-
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Try changing your search or filters.
-                    </p>
+                    {canCreate && (
+                      <Link to="/products/create">
+                        <Button className="mt-5 inline-flex items-center gap-2">
+                          <Plus size={17} />
+                          Add Product
+                        </Button>
+                      </Link>
+                    )}
                   </td>
                 </tr>
-
               ) : (
-
-                filteredProducts.map((product) => (
-
+                products.map((product) => (
                   <tr
                     key={product._id}
-                    className="transition hover:bg-muted/30"
+                    className="transition hover:bg-surface"
                   >
-
-                    {/* Product */}
-
-                    <td className="px-4 py-4">
-
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-
-                        <div className="h-11 w-11 overflow-hidden rounded-lg border border-border bg-muted">
-
+                        <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-primary bg-surface">
                           {product?.images?.[0]?.url ? (
                             <img
                               src={product.images[0].url}
@@ -467,222 +337,304 @@ const Product = () => {
                             />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center">
-                              <Package className="h-5 w-5 text-muted-foreground" />
+                              <Package
+                                size={18}
+                                className="text-secondary"
+                              />
                             </div>
                           )}
-
                         </div>
-
                         <div className="min-w-0">
-
-                          <p className="truncate font-semibold">
-                            {product?.name || "—"}
+                          <p className="truncate font-semibold text-primary">
+                            {toTitleCase(product.name || "") || "—"}
                           </p>
-
-                          <p className="text-xs text-muted-foreground">
-                            {product?.productType || "simple"}
-                          </p>
-
+                          {product.trackSerial && (
+                            <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-brand">
+                              <Smartphone size={12} />
+                              Serial
+                            </span>
+                          )}
                         </div>
-
                       </div>
-
                     </td>
 
-
-                    {/* SKU */}
-
-                    <td className="px-4 py-4">
-                      <span className="font-mono text-xs">
-                        {product?.sku || "—"}
+                    <td className="px-5 py-4">
+                      <span className="font-mono text-xs text-primary">
+                        {product.sku || "—"}
                       </span>
                     </td>
 
-
-                    {/* Category */}
-
-                    <td className="px-4 py-4">
-                      {product?.category?.name || "—"}
+                    <td className="px-5 py-4">
+                      <p className="text-primary">
+                        {toTitleCase(product?.brand?.name || "") || "—"}
+                      </p>
+                      <p className="text-xs text-secondary">
+                        {toTitleCase(product?.model?.name || "") || "—"}
+                      </p>
                     </td>
 
-
-                    {/* Brand */}
-
-                    <td className="px-4 py-4">
-                      {product?.brand?.name || "—"}
+                    <td className="px-5 py-4 capitalize text-secondary">
+                      {product.productType || "simple"}
                     </td>
 
-
-                    {/* Model */}
-
-                    <td className="px-4 py-4">
-                      {product?.model?.name || "—"}
+                    <td className="px-5 py-4 text-right text-primary">
+                      {formatMoney(product.purchasePrice)}
                     </td>
 
-
-                    {/* Purchase */}
-
-                    <td className="px-4 py-4 text-right">
-                      {Number(
-                        product?.purchasePrice || 0
-                      ).toLocaleString()}
+                    <td className="px-5 py-4 text-right font-semibold text-primary">
+                      {formatMoney(product.salePrice)}
                     </td>
 
-
-                    {/* Sale */}
-
-                    <td className="px-4 py-4 text-right font-semibold">
-                      {Number(
-                        product?.salePrice || 0
-                      ).toLocaleString()}
-                    </td>
-
-
-                    {/* Status */}
-
-                    <td className="px-4 py-4 text-center">
-
+                    <td className="px-5 py-4 text-center">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${product?.isActive
-                            ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400"
-                            : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400"
-                          }`}
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                          product.isActive
+                            ? "border border-[var(--color-success)]/20 bg-[var(--color-success)]/10 text-[var(--color-success)]"
+                            : "border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/10 text-[var(--color-danger)]"
+                        }`}
                       >
-                        {product?.isActive
-                          ? "Active"
-                          : "Inactive"}
+                        {product.isActive ? "Active" : "Inactive"}
                       </span>
-
                     </td>
 
-
-                    {/* Actions */}
-
-                    <td className="px-4 py-4">
-
-                      <div className="flex justify-end gap-2">
-
-                        {/* View */}
-
-                        <Link
-                          to={`/products/${product._id}`}
-                          className="rounded-lg border border-border p-2 transition hover:bg-muted"
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setViewing(product)}
+                          className="rounded-lg border border-primary p-2 text-secondary transition hover:bg-muted-action hover:text-primary"
                           title="View"
                         >
-                          <Eye className="h-4 w-4" />
-                        </Link>
+                          <Eye size={16} />
+                        </button>
 
+                        {canUpdate && (
+                          <Link
+                            to={`/products/${product._id}/edit`}
+                            className="rounded-lg border border-primary p-2 text-secondary transition hover:bg-muted-action hover:text-brand"
+                            title="Edit"
+                          >
+                            <Pencil size={16} />
+                          </Link>
+                        )}
 
-                        {/* Edit */}
-
-                        <Link
-                          to={`/products/${product._id}/edit`}
-                          className="rounded-lg border border-border p-2 transition hover:bg-muted"
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Link>
-
-
-                        {/* Restore */}
-
-                        {!product?.isActive && (
+                        {canUpdate && !product.isActive && (
                           <button
                             type="button"
-                            onClick={() =>
-                              setRestoreModal(product)
-                            }
-                            className="rounded-lg border border-border p-2 transition hover:bg-muted"
+                            onClick={() => setRestoreTarget(product)}
+                            className="rounded-lg border border-primary p-2 text-secondary transition hover:bg-muted-action hover:text-primary"
                             title="Restore"
                           >
-                            <RotateCcw className="h-4 w-4" />
+                            <RotateCcw size={16} />
                           </button>
                         )}
 
-
-                        {/* Delete */}
-
-                        {product?.isActive && (
+                        {canDelete && product.isActive && (
                           <button
                             type="button"
-                            onClick={() =>
-                              setDeleteModal(product)
-                            }
-                            className="rounded-lg border border-red-200 p-2 text-red-600 transition hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950"
-                            title="Delete"
+                            onClick={() => setDeleteTarget(product)}
+                            className="rounded-lg border border-[var(--color-danger)]/20 p-2 text-[var(--color-danger)] transition hover:bg-[var(--color-danger)]/10"
+                            title="Deactivate"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 size={16} />
                           </button>
                         )}
-
                       </div>
-
                     </td>
-
                   </tr>
-
                 ))
-
               )}
-
             </tbody>
-
           </table>
-
         </div>
 
-
-        {/* Fetching indicator */}
-
-        {isFetching && !isLoading && (
-          <div className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-            Updating products...
+        {pagination.totalPages > 1 && (
+          <div className="flex flex-col gap-4 border-t border-secondary px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="text-center text-sm text-secondary sm:text-left">
+              Page {pagination.page} of {pagination.totalPages} ·{" "}
+              {pagination.total} total
+            </p>
+            <div className="flex w-full gap-2 sm:w-auto">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="flex-1 rounded-lg border border-primary px-3 py-2 text-sm text-primary transition hover:bg-muted-action disabled:opacity-40 sm:flex-none"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={page >= pagination.totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="flex-1 rounded-lg border border-primary px-3 py-2 text-sm text-primary transition hover:bg-muted-action disabled:opacity-40 sm:flex-none"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
-
       </div>
 
-
-      {/* ==================================================
-          DELETE MODAL
-      ================================================== */}
+      {viewing && (
+        <ProductDetailsModal
+          product={viewing}
+          canUpdate={canUpdate}
+          onClose={() => setViewing(null)}
+        />
+      )}
 
       <ConfirmModal
-        open={Boolean(deleteModal)}
-        onClose={() => setDeleteModal(null)}
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Delete Product"
+        title="Deactivate product?"
         description={
-          deleteModal
-            ? `Are you sure you want to delete "${deleteModal.name}"?`
-            : "Are you sure you want to delete this product?"
+          deleteTarget
+            ? `"${toTitleCase(deleteTarget.name || "")}" will be set inactive (soft delete). You can restore it later from the Inactive filter.`
+            : "Are you sure?"
         }
-        confirmText="Delete"
+        confirmText="Deactivate"
         loading={isDeleting}
         danger
       />
 
-
-      {/* ==================================================
-          RESTORE MODAL
-      ================================================== */}
-
       <ConfirmModal
-        open={Boolean(restoreModal)}
-        onClose={() => setRestoreModal(null)}
+        open={Boolean(restoreTarget)}
+        onClose={() => setRestoreTarget(null)}
         onConfirm={handleRestore}
-        title="Restore Product"
+        title="Restore product?"
         description={
-          restoreModal
-            ? `Are you sure you want to restore "${restoreModal.name}"?`
-            : "Are you sure you want to restore this product?"
+          restoreTarget
+            ? `Restore "${toTitleCase(restoreTarget.name || "")}" and its inventory?`
+            : "Are you sure?"
         }
         confirmText="Restore"
         loading={isRestoring}
       />
-
     </div>
   );
-};
+}
 
-export default Product;
+function SummaryCard({ title, value, icon: Icon }) {
+  return (
+    <div className="rounded-2xl border border-primary bg-card p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm text-secondary">{title}</p>
+          <p className="mt-2 text-2xl font-bold text-primary">{value}</p>
+        </div>
+        <div className="shrink-0 rounded-xl bg-brand/10 p-3 text-brand">
+          <Icon size={21} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductDetailsModal({ product, canUpdate, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4">
+      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-primary bg-card shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-secondary px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-primary">Product details</h2>
+            <p className="mt-1 truncate text-sm text-secondary">
+              {toTitleCase(product.name || "")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-secondary transition hover:bg-muted-action hover:text-primary"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="mb-5 flex justify-center">
+            {product?.images?.[0]?.url ? (
+              <img
+                src={product.images[0].url}
+                alt={product.name}
+                className="h-40 w-40 rounded-2xl border border-primary object-cover"
+              />
+            ) : (
+              <div className="flex h-40 w-40 items-center justify-center rounded-2xl border border-primary bg-surface">
+                <Package size={40} className="text-secondary" />
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <DetailItem label="Name" value={toTitleCase(product.name || "")} />
+            <DetailItem label="SKU" value={product.sku} />
+            <DetailItem
+              label="Brand"
+              value={toTitleCase(product?.brand?.name || "") || "—"}
+            />
+            <DetailItem
+              label="Model"
+              value={toTitleCase(product?.model?.name || "") || "—"}
+            />
+            <DetailItem
+              label="Category"
+              value={product?.category?.name || "—"}
+            />
+            <DetailItem label="Type" value={product.productType} />
+            <DetailItem label="Unit" value={product.unit} />
+            <DetailItem
+              label="Serial tracking"
+              value={product.trackSerial ? "Yes (IMEI)" : "No"}
+            />
+            <DetailItem
+              label="Purchase price"
+              value={formatMoney(product.purchasePrice)}
+            />
+            <DetailItem
+              label="Sale price"
+              value={formatMoney(product.salePrice)}
+            />
+            <DetailItem label="Discount" value={`${product.discount || 0}%`} />
+            <DetailItem label="Tax" value={product.tax || 0} />
+            <DetailItem
+              label="Status"
+              value={product.isActive ? "Active" : "Inactive"}
+            />
+            <DetailItem
+              label="Featured"
+              value={product.isFeatured ? "Yes" : "No"}
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-3 border-t border-secondary p-4">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          {canUpdate && (
+            <Link to={`/products/${product._id}/edit`}>
+              <Button className="inline-flex items-center gap-2">
+                <Pencil size={16} />
+                Edit product
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailItem({ label, value }) {
+  return (
+    <div className="rounded-xl border border-primary bg-surface p-3">
+      <p className="text-xs text-secondary">{label}</p>
+      <p className="mt-1 break-words text-sm font-semibold text-primary">
+        {value ?? "—"}
+      </p>
+    </div>
+  );
+}

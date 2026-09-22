@@ -17,39 +17,23 @@ const productInventoryApi = baseApi.injectEndpoints({
         size = "",
         stockStatus = "",
         search = "",
+        imei = "",
+        unitBarcode = "",
       } = {}) => {
         const params = new URLSearchParams();
 
         params.append("page", page);
         params.append("limit", limit);
 
-        if (product) {
-          params.append("product", product);
-        }
-
-        if (business) {
-          params.append("business", business);
-        }
-
-        if (businessType) {
-          params.append("businessType", businessType);
-        }
-
-        if (color) {
-          params.append("color", color);
-        }
-
-        if (size) {
-          params.append("size", size);
-        }
-
-        if (stockStatus) {
-          params.append("stockStatus", stockStatus);
-        }
-
-        if (search) {
-          params.append("search", search);
-        }
+        if (product) params.append("product", product);
+        if (business) params.append("business", business);
+        if (businessType) params.append("businessType", businessType);
+        if (color) params.append("color", color);
+        if (size) params.append("size", size);
+        if (stockStatus) params.append("stockStatus", stockStatus);
+        if (search) params.append("search", search);
+        if (imei) params.append("imei", imei);
+        if (unitBarcode) params.append("unitBarcode", unitBarcode);
 
         return {
           url: API_ROUTES.productInventory,
@@ -59,11 +43,7 @@ const productInventoryApi = baseApi.injectEndpoints({
       },
 
       providesTags: (result) => [
-        {
-          type: "ProductInventory",
-          id: "LIST",
-        },
-
+        { type: "ProductInventory", id: "LIST" },
         ...(result?.data?.inventory?.map((item) => ({
           type: "ProductInventory",
           id: item._id,
@@ -81,10 +61,7 @@ const productInventoryApi = baseApi.injectEndpoints({
       }),
 
       providesTags: (result, error, productId) => [
-        {
-          type: "ProductInventory",
-          id: `PRODUCT-${productId}`,
-        },
+        { type: "ProductInventory", id: `PRODUCT-${productId}` },
       ],
     }),
 
@@ -98,11 +75,22 @@ const productInventoryApi = baseApi.injectEndpoints({
       }),
 
       providesTags: (result, error, id) => [
-        {
-          type: "ProductInventory",
-          id,
-        },
+        { type: "ProductInventory", id },
       ],
+    }),
+
+    // ==========================================
+    // SCAN BY IMEI OR UNIT BARCODE  ← NEW
+    // ==========================================
+    scanProductInventory: builder.query({
+      query: (code) => ({
+        url: `${API_ROUTES.productInventory}/scan`,
+        method: "GET",
+        params: { code },
+      }),
+
+      // We don't cache scan results long-term
+      keepUnusedDataFor: 30,
     }),
 
     // ==========================================
@@ -116,10 +104,7 @@ const productInventoryApi = baseApi.injectEndpoints({
       }),
 
       invalidatesTags: [
-        {
-          type: "ProductInventory",
-          id: "LIST",
-        },
+        { type: "ProductInventory", id: "LIST" },
         "ProductInventory",
         "Product",
       ],
@@ -136,22 +121,10 @@ const productInventoryApi = baseApi.injectEndpoints({
       }),
 
       invalidatesTags: (result, error, { id, product }) => [
-        {
-          type: "ProductInventory",
-          id,
-        },
-        {
-          type: "ProductInventory",
-          id: "LIST",
-        },
-
+        { type: "ProductInventory", id },
+        { type: "ProductInventory", id: "LIST" },
         ...(product
-          ? [
-              {
-                type: "ProductInventory",
-                id: `PRODUCT-${product}`,
-              },
-            ]
+          ? [{ type: "ProductInventory", id: `PRODUCT-${product}` }]
           : []),
       ],
     }),
@@ -160,28 +133,15 @@ const productInventoryApi = baseApi.injectEndpoints({
     // UPDATE STOCK
     // ==========================================
     updateProductStock: builder.mutation({
-      query: ({
-        id,
-        quantity,
-        operation = "set",
-      }) => ({
+      query: ({ id, quantity, operation = "set" }) => ({
         url: `${API_ROUTES.productInventory}/${id}/stock`,
         method: "PATCH",
-        body: {
-          quantity,
-          operation,
-        },
+        body: { quantity, operation },
       }),
 
       invalidatesTags: (result, error, { id }) => [
-        {
-          type: "ProductInventory",
-          id,
-        },
-        {
-          type: "ProductInventory",
-          id: "LIST",
-        },
+        { type: "ProductInventory", id },
+        { type: "ProductInventory", id: "LIST" },
       ],
     }),
 
@@ -195,10 +155,7 @@ const productInventoryApi = baseApi.injectEndpoints({
       }),
 
       invalidatesTags: [
-        {
-          type: "ProductInventory",
-          id: "LIST",
-        },
+        { type: "ProductInventory", id: "LIST" },
         "ProductInventory",
       ],
     }),
@@ -213,10 +170,7 @@ const productInventoryApi = baseApi.injectEndpoints({
       }),
 
       invalidatesTags: [
-        {
-          type: "ProductInventory",
-          id: "LIST",
-        },
+        { type: "ProductInventory", id: "LIST" },
         "ProductInventory",
       ],
     }),
@@ -229,7 +183,8 @@ export const {
   useGetProductInventoryQuery,
   useGetProductInventoryByProductQuery,
   useGetProductInventoryByIdQuery,
-
+  useScanProductInventoryQuery,          // ← NEW
+  useLazyScanProductInventoryQuery,      // ← useful for barcode scanner
   useCreateProductInventoryMutation,
   useUpdateProductInventoryMutation,
   useUpdateProductStockMutation,

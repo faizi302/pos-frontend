@@ -8,6 +8,8 @@ import {
   ShoppingCart,
   X,
   Package,
+  Smartphone,
+  Hash,
 } from "lucide-react";
 
 import PageHeader from "@/components/common/PageHeader";
@@ -66,12 +68,19 @@ const formatDateTime = (value) => {
 const getSaleNumber = (item) => {
   if (!item?.sale) return "—";
   if (typeof item.sale === "string") return item.sale;
-  return (
-    item.sale.saleNumber ||
-    item.sale.number ||
-    item.sale._id ||
-    "—"
-  );
+  return item.sale.saleNumber || item.sale.number || item.sale._id || "—";
+};
+
+const getCustomerName = (item) => {
+  // Customer can come from the populated sale
+  const sale = item?.sale;
+  if (!sale) return "Walk-in Customer";
+
+  if (typeof sale.customer === "string") return sale.customer;
+  if (sale.customer?.name) return sale.customer.name;
+  if (sale.customerName) return sale.customerName;
+
+  return "Walk-in Customer";
 };
 
 const getProductName = (item) => {
@@ -95,6 +104,10 @@ const getProductSku = (item) => {
 };
 
 const getInventoryLabel = (item) => {
+  // Prefer IMEI if available
+  if (item?.imei) return `IMEI: ${item.imei}`;
+  if (item?.unitBarcode) return `Barcode: ${item.unitBarcode}`;
+
   if (!item?.productInventory) return "";
   if (typeof item.productInventory === "string") {
     return item.productInventory;
@@ -103,9 +116,8 @@ const getInventoryLabel = (item) => {
   const parts = [
     item.productInventory.color,
     item.productInventory.size,
-    item.productInventory.sku,
-    item.productInventory.batchNumber,
-    item.productInventory.name,
+    item.productInventory.imei,
+    item.productInventory.unitBarcode,
   ].filter(Boolean);
 
   return parts.join(" / ");
@@ -147,10 +159,7 @@ export default function SaleItems() {
   const [deleteSaleItem, { isLoading: deletingItem }] =
     useDeleteSaleItemMutation();
 
-  // -------------------------------------------------
-  // Parse API response:
-  // { success, message, data: { saleItems, pagination } }
-  // -------------------------------------------------
+  // Normalize response
   const saleItems = useMemo(() => {
     if (Array.isArray(saleItemResponse?.data?.saleItems)) {
       return saleItemResponse.data.saleItems;
@@ -178,8 +187,11 @@ export default function SaleItems() {
     return saleItems.filter((item) => {
       const productName = getProductName(item).toLowerCase();
       const saleNumber = getSaleNumber(item).toLowerCase();
+      const customerName = getCustomerName(item).toLowerCase();
       const inventoryName = getInventoryLabel(item).toLowerCase();
       const sku = getProductSku(item).toLowerCase();
+      const imei = String(item?.imei || "").toLowerCase();
+      const unitBarcode = String(item?.unitBarcode || "").toLowerCase();
 
       const returnedQuantity = Number(item?.returnedQuantity || 0);
       const quantity = Number(item?.quantity || 0);
@@ -188,19 +200,20 @@ export default function SaleItems() {
         !term ||
         productName.includes(term) ||
         saleNumber.includes(term) ||
+        customerName.includes(term) ||
         inventoryName.includes(term) ||
-        sku.includes(term);
+        sku.includes(term) ||
+        imei.includes(term) ||
+        unitBarcode.includes(term);
 
       let matchesReturn = true;
 
       if (returnFilter === "returned") {
         matchesReturn = returnedQuantity > 0 && returnedQuantity < quantity;
       }
-
       if (returnFilter === "not-returned") {
         matchesReturn = returnedQuantity === 0;
       }
-
       if (returnFilter === "fully-returned") {
         matchesReturn = quantity > 0 && returnedQuantity >= quantity;
       }
@@ -269,11 +282,14 @@ export default function SaleItems() {
   const columns = [
     {
       key: "sale",
-      header: "Sale",
+      header: "Sale / Customer",
       render: (row) => (
         <div className="flex min-w-0 flex-col">
           <span className="font-mono text-sm font-semibold text-primary">
             {getSaleNumber(row)}
+          </span>
+          <span className="text-xs text-secondary">
+            {getCustomerName(row)}
           </span>
           <span className="text-xs text-secondary">
             {formatDate(row?.createdAt)}
@@ -294,17 +310,43 @@ export default function SaleItems() {
               SKU: {getProductSku(row)}
             </span>
           )}
-          {getInventoryLabel(row) && (
-            <span className="text-xs text-secondary">
-              {getInventoryLabel(row)}
-            </span>
-          )}
         </div>
       ),
     },
     {
+      key: "imei",
+      header: "IMEI / Variant",
+      render: (row) => {
+        if (row?.imei) {
+          return (
+            <div className="flex items-center gap-1.5">
+              <Smartphone size={14} className="text-brand" />
+              <span className="font-mono text-xs font-medium text-primary">
+                {row.imei}
+              </span>
+            </div>
+          );
+        }
+        if (row?.unitBarcode) {
+          return (
+            <div className="flex items-center gap-1.5">
+              <Hash size={14} className="text-secondary" />
+              <span className="font-mono text-xs text-primary">
+                {row.unitBarcode}
+              </span>
+            </div>
+          );
+        }
+        return (
+          <span className="text-xs text-secondary">
+            {getInventoryLabel(row) || "—"}
+          </span>
+        );
+      },
+    },
+    {
       key: "quantity",
-      header: "Quantity",
+      header: "Qty",
       render: (row) => (
         <span className="font-mono text-sm text-primary">
           {Number(row?.quantity || 0).toLocaleString("en-PK")}
@@ -313,19 +355,10 @@ export default function SaleItems() {
     },
     {
       key: "salePrice",
-      header: "Sale Price",
+      header: "Price",
       render: (row) => (
         <span className="font-mono text-sm text-primary">
           {formatMoney(row?.salePrice)}
-        </span>
-      ),
-    },
-    {
-      key: "discount",
-      header: "Discount",
-      render: (row) => (
-        <span className="font-mono text-sm text-primary">
-          {formatMoney(row?.discount)}
         </span>
       ),
     },
@@ -369,14 +402,14 @@ export default function SaleItems() {
     <div className="animate-fade-up">
       <PageHeader
         title="Sale Items"
-        description="View and manage individual items included in sales."
+        description="View and manage individual items included in sales (with IMEI support)."
       />
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search sale, product or SKU..."
+          placeholder="Search sale, customer, product, IMEI..."
         />
 
         <Select
@@ -495,6 +528,13 @@ export default function SaleItems() {
               </div>
 
               <div className="rounded-xl border border-secondary bg-card p-4">
+                <p className="text-xs text-secondary">Customer</p>
+                <p className="mt-1 text-sm font-medium text-primary">
+                  {getCustomerName(detailItem)}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-secondary bg-card p-4">
                 <p className="text-xs text-secondary">Product</p>
                 <p className="mt-1 text-sm font-medium text-primary">
                   {getProductName(detailItem)}
@@ -507,16 +547,13 @@ export default function SaleItems() {
               </div>
 
               <div className="rounded-xl border border-secondary bg-card p-4">
-                <p className="text-xs text-secondary">Variant / Inventory</p>
+                <p className="text-xs text-secondary">IMEI / Variant</p>
                 <p className="mt-1 text-sm font-medium text-primary">
-                  {getInventoryLabel(detailItem) || "Standard"}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-secondary bg-card p-4">
-                <p className="text-xs text-secondary">Created</p>
-                <p className="mt-1 text-sm font-medium text-primary">
-                  {formatDateTime(detailItem.createdAt)}
+                  {detailItem.imei
+                    ? detailItem.imei
+                    : detailItem.unitBarcode
+                    ? detailItem.unitBarcode
+                    : getInventoryLabel(detailItem) || "—"}
                 </p>
               </div>
 
@@ -528,7 +565,7 @@ export default function SaleItems() {
               </div>
 
               <div className="rounded-xl border border-secondary bg-card p-4">
-                <p className="text-xs text-secondary">Returned Quantity</p>
+                <p className="text-xs text-secondary">Returned</p>
                 <p className="mt-1 font-mono text-sm font-medium text-primary">
                   {Number(detailItem.returnedQuantity || 0).toLocaleString(
                     "en-PK"
@@ -554,17 +591,6 @@ export default function SaleItems() {
                 <p className="text-xs text-secondary">Tax</p>
                 <p className="mt-1 font-mono text-sm font-medium text-primary">
                   {formatMoney(detailItem.tax)}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-secondary bg-card p-4">
-                <p className="text-xs text-secondary">Line Subtotal</p>
-                <p className="mt-1 font-mono text-sm font-medium text-primary">
-                  {formatMoney(
-                    detailItem.lineSubtotal ??
-                      Number(detailItem.quantity || 0) *
-                        Number(detailItem.salePrice || 0)
-                  )}
                 </p>
               </div>
 
@@ -616,10 +642,8 @@ export default function SaleItems() {
                     {getProductName(editing)}
                   </p>
                   <p className="mt-0.5 text-xs text-secondary">
-                    {getSaleNumber(editing)}
-                    {getProductSku(editing)
-                      ? ` · SKU: ${getProductSku(editing)}`
-                      : ""}
+                    {getSaleNumber(editing)} · {getCustomerName(editing)}
+                    {editing.imei ? ` · IMEI: ${editing.imei}` : ""}
                   </p>
                 </div>
               </div>

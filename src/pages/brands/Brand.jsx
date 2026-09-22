@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, Pencil, Trash2, Tags } from "lucide-react";
+import { Plus, Pencil, Trash2, Tags, Eye } from "lucide-react";
 
 import PageHeader from "@/components/common/PageHeader";
 import SearchInput from "@/components/common/SearchInput";
@@ -19,8 +19,6 @@ import BrandForm from "@/components/forms/BrandForm";
 import { usePermissions } from "@/hooks/usePermissions";
 import { getApiErrorMessage } from "@/utils/apiError";
 
-import { useGetBusinessTypesQuery } from "@/features/businessTypes/businessTypesApi";
-
 import {
   useGetBrandsQuery,
   useCreateBrandMutation,
@@ -28,305 +26,277 @@ import {
   useDeleteBrandMutation,
 } from "@/features/brands/brandsApi";
 
-// ============================================================
-// PERMISSIONS
-// ============================================================
-
 const PERMISSIONS = {
   CREATE: "brands.create",
-  READ: "brands.read",
   UPDATE: "brands.update",
   DELETE: "brands.delete",
 };
 
+const asList = (data) => (Array.isArray(data) ? data : []);
+
+/** "samsung galaxy" / "SAMSUNG" → "Samsung Galaxy" */
+function toTitleCase(value = "") {
+  return String(value)
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function Brand() {
   const { can } = usePermissions();
-
-  // ==========================================================
-  // STATE
-  // ==========================================================
+  const canCreate = can(PERMISSIONS.CREATE);
+  const canUpdate = can(PERMISSIONS.UPDATE);
+  const canDelete = can(PERMISSIONS.DELETE);
 
   const [search, setSearch] = useState("");
-  const [businessTypeFilter, setBusinessTypeFilter] = useState("");
-
+  const [statusFilter, setStatusFilter] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [viewing, setViewing] = useState(null);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
 
-  // ==========================================================
-  // BRANDS
-  // ==========================================================
+  const queryParams = useMemo(() => {
+    const p = {};
+    if (search.trim()) p.search = search.trim();
+    if (statusFilter === "true" || statusFilter === "false") p.isActive = statusFilter;
+    return p;
+  }, [search, statusFilter]);
 
   const {
-    data: brands,
+    data: brandsData,
     isLoading,
     isError,
+    isFetching,
     refetch,
-  } = useGetBrandsQuery(
-    businessTypeFilter
-      ? { businessType: businessTypeFilter }
-      : {}
-  );
+  } = useGetBrandsQuery(queryParams);
 
-  // ==========================================================
-  // BUSINESS TYPES
-  // ==========================================================
+  const brands = asList(brandsData);
 
-  const { data: businessTypes } = useGetBusinessTypesQuery();
-
-  // ==========================================================
-  // MUTATIONS
-  // ==========================================================
-
-  const [createBrand, { isLoading: creating }] =
-    useCreateBrandMutation();
-
-  const [updateBrand, { isLoading: updating }] =
-    useUpdateBrandMutation();
-
-  const [deleteBrand, { isLoading: deletingBrand }] =
-    useDeleteBrandMutation();
-
-  // ==========================================================
-  // FILTER BRANDS
-  // ==========================================================
+  const [createBrand, { isLoading: creating }] = useCreateBrandMutation();
+  const [updateBrand, { isLoading: updating }] = useUpdateBrandMutation();
+  const [deleteBrand, { isLoading: deletingBrand }] = useDeleteBrandMutation();
 
   const filtered = useMemo(() => {
-    if (!brands) return [];
-
-    const searchValue = search.toLowerCase().trim();
-
-    return brands.filter((brand) => {
-      const brandName = brand?.name?.toLowerCase() || "";
-
-      const businessTypeName =
-        brand?.businessType?.name?.toLowerCase() || "";
-
-      const matchesSearch =
-        brandName.includes(searchValue) ||
-        businessTypeName.includes(searchValue);
-
-      const matchesBusinessType =
-        !businessTypeFilter ||
-        brand?.businessType?._id === businessTypeFilter;
-
-      return matchesSearch && matchesBusinessType;
+    const q = search.toLowerCase().trim();
+    if (!q) return brands;
+    return brands.filter((b) => {
+      const name = b?.name?.toLowerCase() || "";
+      const bt = b?.businessType?.name?.toLowerCase() || "";
+      const desc = b?.description?.toLowerCase() || "";
+      return name.includes(q) || bt.includes(q) || desc.includes(q);
     });
-  }, [brands, search, businessTypeFilter]);
-
-  // ==========================================================
-  // CREATE
-  // ==========================================================
+  }, [brands, search]);
 
   function openCreate() {
     setEditing(null);
     setFormOpen(true);
   }
 
-  // ==========================================================
-  // EDIT
-  // ==========================================================
-
   function openEdit(brand) {
+    setViewing(null);
     setEditing(brand);
     setFormOpen(true);
   }
-
-  // ==========================================================
-  // CLOSE FORM
-  // ==========================================================
 
   function closeForm() {
     setFormOpen(false);
     setEditing(null);
   }
 
-  // ==========================================================
-  // CREATE / UPDATE
-  // ==========================================================
-
   async function handleSubmit(values) {
-    try {
-      if (editing) {
-        await updateBrand({
-          id: editing._id,
-          ...values,
-        }).unwrap();
+    const payload = {
+      ...values,
+      name: toTitleCase(values.name),
+      description: values.description?.trim() || "",
+    };
 
+    try {
+      if (editing?._id) {
+        await updateBrand({ id: editing._id, ...payload }).unwrap();
         toast.success("Brand updated successfully");
       } else {
-        await createBrand(values).unwrap();
-
+        await createBrand(payload).unwrap();
         toast.success("Brand created successfully");
       }
-
       closeForm();
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
   }
 
-  // ==========================================================
-  // DELETE
-  // ==========================================================
-
   async function handleDelete() {
     if (!deleting?._id) return;
-
     try {
       await deleteBrand(deleting._id).unwrap();
-
       toast.success("Brand deleted successfully");
-
       setDeleting(null);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
   }
 
-  // ==========================================================
-  // TABLE COLUMNS
-  // ==========================================================
-
   const columns = [
     {
       key: "name",
       header: "Brand",
+      render: (row) => (
+        <div className="min-w-0">
+          <p className="truncate font-medium text-primary">
+            {toTitleCase(row?.name || "") || "—"}
+          </p>
+          {row?.description ? (
+            <p className="mt-0.5 line-clamp-1 text-xs text-secondary">
+              {row.description}
+            </p>
+          ) : null}
+        </div>
+      ),
     },
-
     {
       key: "businessType",
-      header: "Business Type",
-      render: (row) => row?.businessType?.name || "—",
+      header: "Business type",
+      render: (row) => (
+        <span className="text-sm text-primary">
+          {row?.businessType?.name || "—"}
+        </span>
+      ),
     },
-
+    {
+      key: "business",
+      header: "Business",
+      render: (row) => (
+        <span className="text-sm text-secondary">
+          {row?.business?.name || "—"}
+        </span>
+      ),
+    },
     {
       key: "isActive",
       header: "Status",
-      render: (row) => (
-        <StatusBadge active={row?.isActive} />
-      ),
+      render: (row) => <StatusBadge active={row?.isActive} />,
     },
   ];
 
-  // ==========================================================
-  // RENDER
-  // ==========================================================
-
   return (
-    <div>
-      {/* ======================================================
-          PAGE HEADER
-      ======================================================= */}
-
+    <div className="animate-fade-up space-y-4">
       <PageHeader
         title="Brands"
-        description="Manage brands available for each business type."
+        description="Manage brands for your business."
         actions={
-          can(PERMISSIONS.CREATE) && (
-            <Button icon={Plus} onClick={openCreate}>
-              New Brand
+          canCreate ? (
+            <Button type="button" onClick={openCreate}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Brand
             </Button>
-          )
+          ) : null
         }
       />
 
-      {/* ======================================================
-          FILTERS
-      ======================================================= */}
+      {canCreate && (
+        <div className="flex justify-end sm:hidden">
+          <Button type="button" onClick={openCreate}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add Brand
+          </Button>
+        </div>
+      )}
 
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search brands..."
+          placeholder="Search brands…"
+          className="flex-1"
         />
-
         <Select
-          options={(businessTypes || []).map((businessType) => ({
-            value: businessType._id,
-            label: businessType.name,
-          }))}
-          value={businessTypeFilter}
-          placeholder="All business types"
-          onChange={(e) =>
-            setBusinessTypeFilter(e.target.value)
-          }
-          className="sm:w-64"
+          options={[
+            { value: "", label: "All statuses" },
+            { value: "true", label: "Active" },
+            { value: "false", label: "Inactive" },
+          ]}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="sm:w-44"
         />
+        {canCreate && (
+          <Button type="button" onClick={openCreate} className="hidden sm:inline-flex">
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add Brand
+          </Button>
+        )}
       </div>
-
-      {/* ======================================================
-          CONTENT
-      ======================================================= */}
 
       {isLoading ? (
         <TableSkeleton />
       ) : isError ? (
-        <ErrorState
-          onRetry={refetch}
-          description="Unable to load brands."
-        />
+        <ErrorState onRetry={refetch} description="Unable to load brands." />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Tags}
           title="No brands found"
-          description="Create your first brand to get started."
-          actionLabel={
-            can(PERMISSIONS.CREATE)
-              ? "New Brand"
-              : undefined
+          description={
+            search || statusFilter
+              ? "Try a different search or status filter."
+              : "Create your first brand to get started."
           }
-          onAction={
-            can(PERMISSIONS.CREATE)
-              ? openCreate
-              : undefined
-          }
+          actionLabel={canCreate ? "Add Brand" : undefined}
+          onAction={canCreate ? openCreate : undefined}
         />
       ) : (
-        <DataTable
-          columns={columns}
-          data={filtered}
-          actions={(row) => (
-            <div className="flex justify-end gap-1">
-              {/* UPDATE */}
-
-              {can(PERMISSIONS.UPDATE) && (
+        <div
+          className={`overflow-hidden rounded-2xl border border-primary bg-card ${
+            isFetching ? "opacity-80" : ""
+          }`}
+        >
+          <DataTable
+            columns={columns}
+            data={filtered}
+            actions={(row) => (
+              <div className="flex items-center justify-end gap-0.5">
                 <button
                   type="button"
-                  aria-label="Edit brand"
-                  onClick={() => openEdit(row)}
-                  className="rounded-lg p-1.5 text-secondary hover:bg-muted-action hover:text-primary"
+                  title="View"
+                  aria-label="View brand"
+                  onClick={() => setViewing(row)}
+                  className="rounded-lg p-1.5 text-secondary transition-colors hover:bg-muted-action hover:text-primary"
                 >
-                  <Pencil className="h-4 w-4" />
+                  <Eye className="h-4 w-4" />
                 </button>
-              )}
 
-              {/* DELETE */}
+                {canUpdate && (
+                  <button
+                    type="button"
+                    title="Edit"
+                    aria-label="Edit brand"
+                    onClick={() => openEdit(row)}
+                    className="rounded-lg p-1.5 text-secondary transition-colors hover:bg-muted-action hover:text-brand"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
 
-              {can(PERMISSIONS.DELETE) && (
-                <button
-                  type="button"
-                  aria-label="Delete brand"
-                  onClick={() => setDeleting(row)}
-                  className="rounded-lg p-1.5 text-secondary hover:bg-red-500/10 hover:text-red-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          )}
-        />
+                {canDelete && (
+                  <button
+                    type="button"
+                    title="Delete"
+                    aria-label="Delete brand"
+                    onClick={() => setDeleting(row)}
+                    className="rounded-lg p-1.5 text-secondary transition-colors hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          />
+        </div>
       )}
-
-      {/* ======================================================
-          CREATE / EDIT MODAL
-      ======================================================= */}
 
       <Modal
         open={formOpen}
         onClose={closeForm}
-        title={editing ? "Edit Brand" : "Create Brand"}
+        title={editing ? "Edit Brand" : "Add Brand"}
       >
         <BrandForm
           initialValues={editing}
@@ -336,9 +306,34 @@ export default function Brand() {
         />
       </Modal>
 
-      {/* ======================================================
-          DELETE MODAL
-      ======================================================= */}
+      <Modal
+        open={Boolean(viewing)}
+        onClose={() => setViewing(null)}
+        title="Brand details"
+      >
+        {viewing && (
+          <div className="space-y-3 text-sm">
+            <DetailRow label="Name" value={toTitleCase(viewing.name)} />
+            <DetailRow label="Business type" value={viewing.businessType?.name} />
+            <DetailRow label="Business" value={viewing.business?.name} />
+            <DetailRow
+              label="Status"
+              value={viewing.isActive ? "Active" : "Inactive"}
+            />
+            <DetailRow label="Description" value={viewing.description || "—"} />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setViewing(null)}>
+                Close
+              </Button>
+              {canUpdate && (
+                <Button type="button" onClick={() => openEdit(viewing)}>
+                  Edit
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <ConfirmModal
         open={Boolean(deleting)}
@@ -346,8 +341,19 @@ export default function Brand() {
         onConfirm={handleDelete}
         loading={deletingBrand}
         title="Delete brand?"
-        description={`This will permanently remove "${deleting?.name}". This action cannot be undone.`}
+        description={`This will permanently remove "${toTitleCase(
+          deleting?.name || ""
+        )}". This cannot be undone.`}
       />
+    </div>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-xl border border-secondary bg-surface px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-xs font-medium text-secondary">{label}</span>
+      <span className="font-medium text-primary">{value || "—"}</span>
     </div>
   );
 }

@@ -37,9 +37,7 @@ export const saleItemApi = baseApi.injectEndpoints({
         url: `${API_ROUTES.saleItems}/${id}`,
         method: "GET",
       }),
-      providesTags: (result, error, id) => [
-        { type: "SaleItem", id },
-      ],
+      providesTags: (result, error, id) => [{ type: "SaleItem", id }],
     }),
 
     updateSaleItem: builder.mutation({

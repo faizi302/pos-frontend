@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Plus, Pencil, Trash2, Box } from "lucide-react";
+import { Plus, Pencil, Trash2, Box, Eye } from "lucide-react";
 
 import PageHeader from "@/components/common/PageHeader";
 import SearchInput from "@/components/common/SearchInput";
@@ -20,7 +20,6 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { getApiErrorMessage } from "@/utils/apiError";
 
 import { useGetBrandsQuery } from "@/features/brands/brandsApi";
-
 import {
   useGetModelsQuery,
   useCreateModelMutation,
@@ -28,313 +27,294 @@ import {
   useDeleteModelMutation,
 } from "@/features/models/modelsApi";
 
-// ============================================================
-// PERMISSIONS
-// ============================================================
-
 const PERMISSIONS = {
   CREATE: "models.create",
-  READ: "models.read",
   UPDATE: "models.update",
   DELETE: "models.delete",
 };
 
+const asList = (data) => (Array.isArray(data) ? data : []);
+
+/** "galaxy s20" / "GALAXY S20" → "Galaxy S20" */
+function toTitleCase(value = "") {
+  return String(value)
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function Model() {
   const { can } = usePermissions();
-
-  // ==========================================================
-  // STATE
-  // ==========================================================
+  const canCreate = can(PERMISSIONS.CREATE);
+  const canUpdate = can(PERMISSIONS.UPDATE);
+  const canDelete = can(PERMISSIONS.DELETE);
 
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
-
+  const [statusFilter, setStatusFilter] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [viewing, setViewing] = useState(null);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
 
-  // ==========================================================
-  // MODELS
-  // ==========================================================
+  const queryParams = useMemo(() => {
+    const p = {};
+    if (search.trim()) p.search = search.trim();
+    if (brandFilter) p.brand = brandFilter;
+    if (statusFilter === "true" || statusFilter === "false") p.isActive = statusFilter;
+    return p;
+  }, [search, brandFilter, statusFilter]);
 
   const {
-    data: models,
+    data: modelsData,
     isLoading,
     isError,
+    isFetching,
     refetch,
-  } = useGetModelsQuery(
-    brandFilter
-      ? { brand: brandFilter }
-      : {}
-  );
+  } = useGetModelsQuery(queryParams);
 
-  // ==========================================================
-  // BRANDS
-  // ==========================================================
+  const models = asList(modelsData);
 
-  const { data: brands } = useGetBrandsQuery();
+  const { data: brandsData } = useGetBrandsQuery();
+  const brands = asList(brandsData);
 
-  // ==========================================================
-  // MUTATIONS
-  // ==========================================================
-
-  const [createModel, { isLoading: creating }] =
-    useCreateModelMutation();
-
-  const [updateModel, { isLoading: updating }] =
-    useUpdateModelMutation();
-
-  const [deleteModel, { isLoading: deletingModel }] =
-    useDeleteModelMutation();
-
-  // ==========================================================
-  // FILTER MODELS
-  // ==========================================================
+  const [createModel, { isLoading: creating }] = useCreateModelMutation();
+  const [updateModel, { isLoading: updating }] = useUpdateModelMutation();
+  const [deleteModel, { isLoading: deletingModel }] = useDeleteModelMutation();
 
   const filtered = useMemo(() => {
-    if (!models) return [];
-
-    const searchValue = search.toLowerCase().trim();
-
-    return models.filter((model) => {
-      const modelName =
-        model?.name?.toLowerCase() || "";
-
-      const brandName =
-        model?.brand?.name?.toLowerCase() || "";
-
-      const matchesSearch =
-        modelName.includes(searchValue) ||
-        brandName.includes(searchValue);
-
-      const matchesBrand =
-        !brandFilter ||
-        model?.brand?._id === brandFilter;
-
-      return matchesSearch && matchesBrand;
+    const q = search.toLowerCase().trim();
+    if (!q) return models;
+    return models.filter((m) => {
+      const name = m?.name?.toLowerCase() || "";
+      const brand = m?.brand?.name?.toLowerCase() || "";
+      const bt = m?.businessType?.name?.toLowerCase() || "";
+      return name.includes(q) || brand.includes(q) || bt.includes(q);
     });
-  }, [models, search, brandFilter]);
-
-  // ==========================================================
-  // CREATE
-  // ==========================================================
+  }, [models, search]);
 
   function openCreate() {
     setEditing(null);
     setFormOpen(true);
   }
 
-  // ==========================================================
-  // EDIT
-  // ==========================================================
-
   function openEdit(model) {
+    setViewing(null);
     setEditing(model);
     setFormOpen(true);
   }
-
-  // ==========================================================
-  // CLOSE FORM
-  // ==========================================================
 
   function closeForm() {
     setFormOpen(false);
     setEditing(null);
   }
 
-  // ==========================================================
-  // CREATE / UPDATE
-  // ==========================================================
-
   async function handleSubmit(values) {
-    try {
-      if (editing) {
-        await updateModel({
-          id: editing._id,
-          ...values,
-        }).unwrap();
+    const payload = {
+      ...values,
+      name: toTitleCase(values.name),
+      description: values.description?.trim() || "",
+    };
 
+    try {
+      if (editing?._id) {
+        await updateModel({ id: editing._id, ...payload }).unwrap();
         toast.success("Model updated successfully");
       } else {
-        await createModel(values).unwrap();
-
+        await createModel(payload).unwrap();
         toast.success("Model created successfully");
       }
-
       closeForm();
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
   }
 
-  // ==========================================================
-  // DELETE
-  // ==========================================================
-
   async function handleDelete() {
     if (!deleting?._id) return;
-
     try {
       await deleteModel(deleting._id).unwrap();
-
       toast.success("Model deleted successfully");
-
       setDeleting(null);
     } catch (error) {
       toast.error(getApiErrorMessage(error));
     }
   }
 
-  // ==========================================================
-  // TABLE COLUMNS
-  // ==========================================================
-
   const columns = [
     {
       key: "name",
       header: "Model",
+      render: (row) => (
+        <div className="min-w-0">
+          <p className="truncate font-medium text-primary">
+            {toTitleCase(row?.name || "") || "—"}
+          </p>
+          {row?.description ? (
+            <p className="mt-0.5 line-clamp-1 text-xs text-secondary">
+              {row.description}
+            </p>
+          ) : null}
+        </div>
+      ),
     },
-
     {
       key: "brand",
       header: "Brand",
-      render: (row) => row?.brand?.name || "—",
+      render: (row) => (
+        <span className="text-sm text-primary">
+          {toTitleCase(row?.brand?.name || "") || "—"}
+        </span>
+      ),
     },
-
     {
       key: "businessType",
-      header: "Business Type",
-      render: (row) =>
-        row?.businessType?.name || "—",
+      header: "Business type",
+      render: (row) => (
+        <span className="text-sm text-secondary">
+          {row?.businessType?.name || "—"}
+        </span>
+      ),
     },
-
     {
       key: "isActive",
       header: "Status",
-      render: (row) => (
-        <StatusBadge active={row?.isActive} />
-      ),
+      render: (row) => <StatusBadge active={row?.isActive} />,
     },
   ];
 
-  // ==========================================================
-  // RENDER
-  // ==========================================================
-
   return (
-    <div>
-      {/* ======================================================
-          PAGE HEADER
-      ======================================================= */}
-
+    <div className="animate-fade-up space-y-4">
       <PageHeader
         title="Models"
         description="Manage product models under each brand."
         actions={
-          can(PERMISSIONS.CREATE) && (
-            <Button icon={Plus} onClick={openCreate}>
-              New Model
+          canCreate ? (
+            <Button type="button" onClick={openCreate}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Model
             </Button>
-          )
+          ) : null
         }
       />
 
-      {/* ======================================================
-          FILTERS
-      ======================================================= */}
+      {canCreate && (
+        <div className="flex justify-end sm:hidden">
+          <Button type="button" onClick={openCreate}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add Model
+          </Button>
+        </div>
+      )}
 
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search models..."
+          placeholder="Search models…"
+          className="flex-1"
         />
-
         <Select
-          options={(brands || []).map((brand) => ({
-            value: brand._id,
-            label: brand.name,
-          }))}
+          options={[
+            { value: "", label: "All brands" },
+            ...brands.map((b) => ({
+              value: b._id,
+              label: toTitleCase(b.name),
+            })),
+          ]}
           value={brandFilter}
-          placeholder="All brands"
-          onChange={(e) =>
-            setBrandFilter(e.target.value)
-          }
-          className="sm:w-64"
+          onChange={(e) => setBrandFilter(e.target.value)}
+          className="sm:w-52"
         />
+        <Select
+          options={[
+            { value: "", label: "All statuses" },
+            { value: "true", label: "Active" },
+            { value: "false", label: "Inactive" },
+          ]}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="sm:w-40"
+        />
+        {canCreate && (
+          <Button type="button" onClick={openCreate} className="hidden sm:inline-flex">
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add Model
+          </Button>
+        )}
       </div>
-
-      {/* ======================================================
-          CONTENT
-      ======================================================= */}
 
       {isLoading ? (
         <TableSkeleton />
       ) : isError ? (
-        <ErrorState
-          onRetry={refetch}
-          description="Unable to load models."
-        />
+        <ErrorState onRetry={refetch} description="Unable to load models." />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Box}
           title="No models found"
-          description="Create your first model to get started."
-          actionLabel={
-            can(PERMISSIONS.CREATE)
-              ? "New Model"
-              : undefined
+          description={
+            search || brandFilter || statusFilter
+              ? "Try a different search or filter."
+              : "Create your first model to get started."
           }
-          onAction={
-            can(PERMISSIONS.CREATE)
-              ? openCreate
-              : undefined
-          }
+          actionLabel={canCreate ? "Add Model" : undefined}
+          onAction={canCreate ? openCreate : undefined}
         />
       ) : (
-        <DataTable
-          columns={columns}
-          data={filtered}
-          actions={(row) => (
-            <div className="flex justify-end gap-1">
-              {/* UPDATE */}
-
-              {can(PERMISSIONS.UPDATE) && (
+        <div
+          className={`overflow-hidden rounded-2xl border border-primary bg-card ${
+            isFetching ? "opacity-80" : ""
+          }`}
+        >
+          <DataTable
+            columns={columns}
+            data={filtered}
+            actions={(row) => (
+              <div className="flex items-center justify-end gap-0.5">
                 <button
                   type="button"
-                  aria-label="Edit model"
-                  onClick={() => openEdit(row)}
-                  className="rounded-lg p-1.5 text-secondary hover:bg-muted-action hover:text-primary"
+                  title="View"
+                  aria-label="View model"
+                  onClick={() => setViewing(row)}
+                  className="rounded-lg p-1.5 text-secondary transition-colors hover:bg-muted-action hover:text-primary"
                 >
-                  <Pencil className="h-4 w-4" />
+                  <Eye className="h-4 w-4" />
                 </button>
-              )}
 
-              {/* DELETE */}
+                {canUpdate && (
+                  <button
+                    type="button"
+                    title="Edit"
+                    aria-label="Edit model"
+                    onClick={() => openEdit(row)}
+                    className="rounded-lg p-1.5 text-secondary transition-colors hover:bg-muted-action hover:text-brand"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
 
-              {can(PERMISSIONS.DELETE) && (
-                <button
-                  type="button"
-                  aria-label="Delete model"
-                  onClick={() => setDeleting(row)}
-                  className="rounded-lg p-1.5 text-secondary hover:bg-red-500/10 hover:text-red-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          )}
-        />
+                {canDelete && (
+                  <button
+                    type="button"
+                    title="Delete"
+                    aria-label="Delete model"
+                    onClick={() => setDeleting(row)}
+                    className="rounded-lg p-1.5 text-secondary transition-colors hover:bg-[var(--color-danger)]/10 hover:text-[var(--color-danger)]"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          />
+        </div>
       )}
-
-      {/* ======================================================
-          CREATE / EDIT MODAL
-      ======================================================= */}
 
       <Modal
         open={formOpen}
         onClose={closeForm}
-        title={editing ? "Edit Model" : "Create Model"}
+        title={editing ? "Edit Model" : "Add Model"}
       >
         <ModelForm
           initialValues={editing}
@@ -344,9 +324,38 @@ export default function Model() {
         />
       </Modal>
 
-      {/* ======================================================
-          DELETE MODAL
-      ======================================================= */}
+      <Modal
+        open={Boolean(viewing)}
+        onClose={() => setViewing(null)}
+        title="Model details"
+      >
+        {viewing && (
+          <div className="space-y-3 text-sm">
+            <DetailRow label="Name" value={toTitleCase(viewing.name)} />
+            <DetailRow
+              label="Brand"
+              value={toTitleCase(viewing.brand?.name || "")}
+            />
+            <DetailRow label="Business type" value={viewing.businessType?.name} />
+            <DetailRow label="Business" value={viewing.business?.name} />
+            <DetailRow
+              label="Status"
+              value={viewing.isActive ? "Active" : "Inactive"}
+            />
+            <DetailRow label="Description" value={viewing.description || "—"} />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setViewing(null)}>
+                Close
+              </Button>
+              {canUpdate && (
+                <Button type="button" onClick={() => openEdit(viewing)}>
+                  Edit
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <ConfirmModal
         open={Boolean(deleting)}
@@ -354,8 +363,19 @@ export default function Model() {
         onConfirm={handleDelete}
         loading={deletingModel}
         title="Delete model?"
-        description={`This will permanently remove "${deleting?.name}". This action cannot be undone.`}
+        description={`This will permanently remove "${toTitleCase(
+          deleting?.name || ""
+        )}". This cannot be undone.`}
       />
+    </div>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-xl border border-secondary bg-surface px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-xs font-medium text-secondary">{label}</span>
+      <span className="font-medium text-primary">{value || "—"}</span>
     </div>
   );
 }
