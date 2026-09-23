@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { UserRound, Upload, X } from "lucide-react";
+import { UserRound, Upload, X, Image as ImageIcon } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
 
@@ -27,6 +27,10 @@ const emptyForm = {
   email: "",
   phone: "",
   password: "",
+  confirmPassword: "",
+  country: "",
+  city: "",
+  address: "",
   business: "",
   businessType: "",
 };
@@ -38,13 +42,16 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const Signup = () => {
   const navigate = useNavigate();
 
-  const fileInputRef = useRef(null);
+  const avatarInputRef = useRef(null);
+  const logoInputRef = useRef(null);
 
   const [form, setForm] = useState(emptyForm);
 
   const [avatar, setAvatar] = useState(null);
-
   const [avatarPreview, setAvatarPreview] = useState("");
+
+  const [logo, setLogo] = useState(null);
+  const [logoPreview, setLogoPreview] = useState("");
 
   const [errors, setErrors] = useState({});
 
@@ -140,6 +147,9 @@ const Signup = () => {
       ...prev,
       [name]: "",
       ...(name === "business" ? { businessType: "" } : {}),
+      ...(name === "password" || name === "confirmPassword"
+        ? { confirmPassword: "" }
+        : {}),
     }));
   };
 
@@ -150,43 +160,63 @@ const Signup = () => {
 
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
-
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      toast.error("Please select a valid image");
+      toast.error("Please select a valid image for profile picture");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Avatar must be less than 5MB");
+      toast.error("Profile picture must be less than 5MB");
       return;
     }
 
-    if (avatarPreview) {
-      URL.revokeObjectURL(avatarPreview);
-    }
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
 
     setAvatar(file);
-
-    const previewUrl = URL.createObjectURL(file);
-
-    setAvatarPreview(previewUrl);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
 
   const handleRemoveAvatar = () => {
-    if (avatarPreview) {
-      URL.revokeObjectURL(avatarPreview);
-    }
-
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     setAvatar(null);
-
     setAvatarPreview("");
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
+  };
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+
+  // =====================================================
+  // LOGO (Business Logo)
+  // =====================================================
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image for business logo");
+      return;
     }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Business logo must be less than 5MB");
+      return;
+    }
+
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+
+    setLogo(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+
+  const handleRemoveLogo = () => {
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+    setLogo(null);
+    setLogoPreview("");
+    if (logoInputRef.current) logoInputRef.current.value = "";
   };
 
 
@@ -197,39 +227,48 @@ const Signup = () => {
   const validateForm = () => {
     const newErrors = {};
 
+    // Name (required)
     if (!form.name.trim()) {
       newErrors.name = "Name is required";
     } else if (form.name.trim().length < 2) {
       newErrors.name = "Name must be at least 2 characters";
     }
 
+    // Email (required)
     if (!form.email.trim()) {
       newErrors.email = "Email is required";
     } else if (!emailRegex.test(form.email.trim())) {
       newErrors.email = "Please enter a valid email";
     }
 
-    if (!form.phone.trim()) {
-      newErrors.phone = "Phone is required";
-    } else if (form.phone.trim().length < 10) {
+    // Phone (optional – only validate format if provided)
+    if (form.phone.trim() && form.phone.trim().length < 10) {
       newErrors.phone = "Please enter a valid phone number";
     }
 
+    // Password (required)
     if (!form.password) {
       newErrors.password = "Password is required";
     } else if (form.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters";
     }
 
-    if (!form.business) {
-      newErrors.business = "Please select a business";
+    // Confirm Password (required)
+    if (!form.confirmPassword) {
+      newErrors.confirmPassword = "Confirm password is required";
+    } else if (form.password !== form.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
     }
 
-    if (!form.businessType) {
-      newErrors.businessType = "Please select a business type";
-    }
+    // Country / City / Address – optional (no required check)
 
     setErrors(newErrors);
+
+    // Show the first error in toast
+    const firstError = Object.values(newErrors)[0];
+    if (firstError) {
+      toast.error(firstError);
+    }
 
     return Object.keys(newErrors).length === 0;
   };
@@ -242,31 +281,46 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      toast.error("Please fix the highlighted fields");
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       const formData = new FormData();
 
       formData.append("name", form.name.trim());
-
-      formData.append(
-        "email",
-        form.email.trim().toLowerCase()
-      );
-
-      formData.append("phone", form.phone.trim());
-
+      formData.append("email", form.email.trim().toLowerCase());
       formData.append("password", form.password);
+      formData.append("confirmPassword", form.confirmPassword);
 
-      formData.append("business", form.business);
+      if (form.phone.trim()) {
+        formData.append("phone", form.phone.trim());
+      }
 
-      formData.append("businessType", form.businessType);
+      if (form.country.trim()) {
+        formData.append("country", form.country.trim());
+      }
+
+      if (form.city.trim()) {
+        formData.append("city", form.city.trim());
+      }
+
+      if (form.address.trim()) {
+        formData.append("address", form.address.trim());
+      }
+
+      if (form.business) {
+        formData.append("business", form.business);
+      }
+
+      if (form.businessType) {
+        formData.append("businessType", form.businessType);
+      }
 
       if (avatar) {
         formData.append("avatar", avatar);
+      }
+
+      if (logo) {
+        formData.append("logo", logo);
       }
 
       const response = await signup(formData).unwrap();
@@ -277,7 +331,6 @@ const Signup = () => {
       );
 
       navigate("/login");
-
     } catch (error) {
       const message =
         error?.data?.message ||
@@ -292,10 +345,6 @@ const Signup = () => {
   return (
     <div className="w-full min-h-screen bg-surface flex items-center justify-center">
 
-      {/* =====================================================
-          SIGNUP CONTENT
-      ===================================================== */}
-
       <div className="w-full">
 
         {/* =====================================================
@@ -303,29 +352,20 @@ const Signup = () => {
         ===================================================== */}
 
         <div className="w-full pb-5 border-b border-primary">
-
           <div className="flex items-center gap-3">
-
             <div className="w-11 h-11 shrink-0 rounded-xl bg-brand flex items-center justify-center">
-
               <UserRound className="w-5 h-5 text-white" />
-
             </div>
 
             <div className="min-w-0">
-
               <h1 className="text-xl sm:text-2xl font-semibold text-primary">
                 Create Account
               </h1>
-
               <p className="text-sm text-secondary mt-1">
                 Register your Admin account and select your business.
               </p>
-
             </div>
-
           </div>
-
         </div>
 
 
@@ -342,83 +382,126 @@ const Signup = () => {
           >
 
             {/* =====================================================
-                AVATAR
+                PROFILE PICTURE + BUSINESS LOGO
             ===================================================== */}
 
-            <div className="w-full">
+            <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6">
 
-              <label className="block text-sm font-medium text-primary mb-3">
-                Profile Picture{" "}
-                <span className="text-secondary font-normal">
-                  (Optional)
-                </span>
-              </label>
+              {/* Avatar */}
+              <div className="w-full">
+                <label className="block text-sm font-medium text-primary mb-3">
+                  Profile Picture{" "}
+                  <span className="text-secondary font-normal">(Optional)</span>
+                </label>
 
+                <div className="flex items-center gap-4">
+                  <div className="relative shrink-0">
+                    <div className="w-20 h-20 rounded-full border border-primary bg-surface overflow-hidden flex items-center justify-center">
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Profile preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <UserRound className="w-8 h-8 text-secondary" />
+                      )}
+                    </div>
 
-              <div className="flex items-center gap-4">
-
-                {/* Avatar Preview */}
-
-                <div className="relative shrink-0">
-
-                  <div className="w-20 h-20 rounded-full border border-primary bg-surface overflow-hidden flex items-center justify-center">
-
-                    {avatarPreview ? (
-                      <img
-                        src={avatarPreview}
-                        alt="Profile preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <UserRound className="w-8 h-8 text-secondary" />
+                    {avatarPreview && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+                        aria-label="Remove profile picture"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     )}
-
                   </div>
 
+                  <div className="min-w-0">
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
 
-                  {avatarPreview && (
-                    <button
+                    <Button
                       type="button"
-                      onClick={handleRemoveAvatar}
-                      className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
-                      aria-label="Remove profile picture"
+                      variant="secondary"
+                      onClick={() => avatarInputRef.current?.click()}
                     >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Image
+                    </Button>
 
+                    <p className="text-xs text-secondary mt-2">
+                      JPG, PNG or WEBP. Max 5MB.
+                    </p>
+                  </div>
                 </div>
+              </div>
 
 
-                {/* Upload */}
+              {/* Logo */}
+              <div className="w-full">
+                <label className="block text-sm font-medium text-primary mb-3">
+                  Business Logo{" "}
+                  <span className="text-secondary font-normal">(Optional)</span>
+                </label>
 
-                <div className="min-w-0">
+                <div className="flex items-center gap-4">
+                  <div className="relative shrink-0">
+                    <div className="w-20 h-20 rounded-xl border border-primary bg-surface overflow-hidden flex items-center justify-center">
+                      {logoPreview ? (
+                        <img
+                          src={logoPreview}
+                          alt="Logo preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-secondary" />
+                      )}
+                    </div>
 
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarChange}
-                    className="hidden"
-                  />
+                    {logoPreview && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+                        aria-label="Remove business logo"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
 
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() =>
-                      fileInputRef.current?.click()
-                    }
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Image
-                  </Button>
+                  <div className="min-w-0">
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoChange}
+                      className="hidden"
+                    />
 
-                  <p className="text-xs text-secondary mt-2">
-                    JPG, PNG or WEBP. Maximum 5MB.
-                  </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Logo
+                    </Button>
 
+                    <p className="text-xs text-secondary mt-2">
+                      Recommended square. Max 5MB.
+                    </p>
+                  </div>
                 </div>
-
               </div>
 
             </div>
@@ -429,11 +512,9 @@ const Signup = () => {
             ===================================================== */}
 
             <div className="w-full">
-
               <h2 className="text-base font-semibold text-primary mb-4">
                 Personal Information
               </h2>
-
 
               <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -447,7 +528,6 @@ const Signup = () => {
                   required
                 />
 
-
                 <Input
                   label="Email"
                   name="email"
@@ -459,7 +539,6 @@ const Signup = () => {
                   required
                 />
 
-
                 <Input
                   label="Phone"
                   name="phone"
@@ -467,9 +546,7 @@ const Signup = () => {
                   onChange={handleChange}
                   placeholder="03XX XXXXXXX"
                   error={errors.phone}
-                  required
                 />
-
 
                 <PasswordInput
                   label="Password"
@@ -481,8 +558,64 @@ const Signup = () => {
                   required
                 />
 
-              </div>
+                <PasswordInput
+                  label="Confirm Password"
+                  name="confirmPassword"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="Re-enter password"
+                  error={errors.confirmPassword}
+                  required
+                />
 
+              </div>
+            </div>
+
+
+            {/* =====================================================
+                ADDRESS INFORMATION
+            ===================================================== */}
+
+            <div className="w-full">
+              <h2 className="text-base font-semibold text-primary mb-4">
+                Address Information{" "}
+                <span className="text-secondary font-normal text-sm">
+                  (Optional)
+                </span>
+              </h2>
+
+              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <Input
+                  label="Country"
+                  name="country"
+                  value={form.country}
+                  onChange={handleChange}
+                  placeholder="e.g. Pakistan"
+                  error={errors.country}
+                />
+
+                <Input
+                  label="City"
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                  placeholder="e.g. Lahore"
+                  error={errors.city}
+                />
+
+                <div className="md:col-span-2">
+                  <Input
+                    label="Address"
+                    name="address"
+                    value={form.address}
+                    onChange={handleChange}
+                    placeholder="Enter full address"
+                    error={errors.address}
+                  />
+                </div>
+
+              </div>
             </div>
 
 
@@ -491,37 +624,27 @@ const Signup = () => {
             ===================================================== */}
 
             <div className="w-full">
-
               <h2 className="text-base font-semibold text-primary mb-4">
                 Account & Business
               </h2>
 
-
               <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                {/* Role */}
-
+                {/* Role (read-only) */}
                 <div className="w-full">
-
                   <label className="block text-sm font-medium text-primary mb-2">
                     Role
                   </label>
-
                   <div className="w-full min-h-11 px-3 flex items-center rounded-lg border border-primary bg-surface text-primary text-sm">
                     Admin
                   </div>
-
                   <p className="text-xs text-secondary mt-1.5">
                     Public registrations are created as Admin accounts.
                   </p>
-
                 </div>
 
-
-                {/* Business */}
-
+                {/* Business (optional) */}
                 <div className="w-full">
-
                   <Select
                     label="Business"
                     name="business"
@@ -531,23 +654,15 @@ const Signup = () => {
                     placeholder={
                       isLoadingBusinesses
                         ? "Loading businesses..."
-                        : "Select business"
+                        : "Select business (optional)"
                     }
-                    disabled={
-                      isLoadingBusinesses ||
-                      isSigningUp
-                    }
+                    disabled={isLoadingBusinesses || isSigningUp}
                     error={errors.business}
-                    required
                   />
-
                 </div>
 
-
-                {/* Business Type */}
-
+                {/* Business Type (optional) */}
                 <div className="w-full md:col-span-2">
-
                   <Select
                     label="Business Type"
                     name="businessType"
@@ -557,12 +672,11 @@ const Signup = () => {
                     placeholder={
                       !form.business
                         ? "Select business first"
-                        : isLoadingBusinessTypes ||
-                          isFetchingBusinessTypes
+                        : isLoadingBusinessTypes || isFetchingBusinessTypes
                         ? "Loading business types..."
                         : businessTypeOptions.length === 0
                         ? "No business types available"
-                        : "Select business type"
+                        : "Select business type (optional)"
                     }
                     disabled={
                       !form.business ||
@@ -571,39 +685,30 @@ const Signup = () => {
                       isSigningUp
                     }
                     error={errors.businessType}
-                    required
                   />
 
-
-                  {form.business &&
-                    businessTypeOptions.length > 0 && (
-                      <p className="text-xs text-secondary mt-1.5">
-                        Only business types belonging to the selected
-                        business are shown.
-                      </p>
-                    )}
-
+                  {form.business && businessTypeOptions.length > 0 && (
+                    <p className="text-xs text-secondary mt-1.5">
+                      Only business types belonging to the selected business
+                      are shown.
+                    </p>
+                  )}
                 </div>
 
               </div>
-
             </div>
 
 
             {/* =====================================================
-                ACCOUNT INFORMATION
+                ACCOUNT INFO NOTE
             ===================================================== */}
 
             <div className="w-full rounded-xl border border-primary bg-surface px-4 py-3">
-
               <p className="text-sm text-secondary leading-6">
-
                 Your account will be registered with the{" "}
                 <strong>Admin</strong> role. The account will remain{" "}
-                <strong>pending</strong> until it is approved.
-
+                <strong>pending</strong> until it is approved by Super Admin.
               </p>
-
             </div>
 
 
@@ -612,30 +717,23 @@ const Signup = () => {
             ===================================================== */}
 
             <div className="w-full pt-1">
-
               <Button
                 type="submit"
                 className="w-full"
                 disabled={isSigningUp}
               >
-                {isSigningUp
-                  ? "Creating Account..."
-                  : "Create Account"}
+                {isSigningUp ? "Creating Account..." : "Create Account"}
               </Button>
-
             </div>
 
 
             {/* =====================================================
-                LOGIN
+                LOGIN LINK
             ===================================================== */}
 
             <div className="w-full text-center pb-1">
-
               <p className="text-sm text-secondary">
-
                 Already have an account?{" "}
-
                 <button
                   type="button"
                   onClick={() => navigate("/login")}
@@ -643,9 +741,7 @@ const Signup = () => {
                 >
                   Login
                 </button>
-
               </p>
-
             </div>
 
           </form>

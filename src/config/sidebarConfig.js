@@ -144,14 +144,7 @@ export const sidebarConfig = [
     comingSoon: false,
   },
 
-  {
-    title: "Stock Movements",
-    path: "/stock-movements",
-    icon: ArrowLeftRight,
-    section: "Products & Inventory",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
+
 
   // =====================================================
   // PURCHASES
@@ -277,14 +270,7 @@ export const sidebarConfig = [
     comingSoon: false,
   },
 
-  {
-    title: "Payments",
-    path: "/payments",
-    icon: CircleDollarSign,
-    section: "Finance",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
+
 
   // =====================================================
   // REPORTS
@@ -299,95 +285,7 @@ export const sidebarConfig = [
     comingSoon: true,
   },
 
-  {
-    title: "Sales Report",
-    path: "/reports/sales",
-    icon: BarChart3,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
 
-  {
-    title: "Top Products",
-    path: "/reports/top-products",
-    icon: ChartNoAxesCombined,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
-
-  {
-    title: "Purchases Report",
-    path: "/reports/purchases",
-    icon: ClipboardList,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
-
-  {
-    title: "Inventory Report",
-    path: "/reports/inventory",
-    icon: Warehouse,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
-
-  {
-    title: "Expenses Report",
-    path: "/reports/expenses",
-    icon: WalletCards,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
-
-  {
-    title: "Customers Report",
-    path: "/reports/customers",
-    icon: UsersRound,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
-
-  {
-    title: "Suppliers Report",
-    path: "/reports/suppliers",
-    icon: Truck,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
-
-  {
-    title: "Stock Movements Report",
-    path: "/reports/stock-movements",
-    icon: ArrowLeftRight,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
-
-  {
-    title: "Payments Report",
-    path: "/reports/payments",
-    icon: CreditCard,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
-
-  {
-    title: "Cash Register Report",
-    path: "/reports/cash-register",
-    icon: Landmark,
-    section: "Reports",
-    roles: ["admin", "manager"],
-    comingSoon: true,
-  },
 
   {
     title: "Profit & Loss",

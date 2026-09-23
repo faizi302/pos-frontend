@@ -8,7 +8,6 @@ import {
   X,
 } from "lucide-react";
 
-
 import { sidebarConfig } from "@/config/sidebarConfig";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -39,14 +38,133 @@ function groupBySection(items) {
 }
 
 // =====================================================
+// BUILD FALLBACK TEXT LOGO
+// "Muhammad Fazian" + "Mobiles" → "Muhammad Mobiles"
+// =====================================================
+
+function getFallbackLogoText(user) {
+  if (!user) return "POS";
+
+  const firstName = user.name?.trim().split(/\s+/)[0] || "POS";
+  const businessTypeName = user.businessType?.name?.trim() || "";
+
+  if (businessTypeName) {
+    return `${firstName} ${businessTypeName}`;
+  }
+
+  return firstName;
+}
+
+// =====================================================
+// SIDEBAR LOGO (role-aware)
+// =====================================================
+
+function SidebarLogo({ collapsed }) {
+  const { user, role } = usePermissions();
+
+  // ---------- SUPER ADMIN → static brand logos ----------
+  if (role === "super-admin") {
+    return collapsed ? (
+      <img
+        src="/images/mylogo3.png"
+        alt="POS"
+        className="mx-auto h-9 w-9 shrink-0 object-contain"
+      />
+    ) : (
+      <img
+        src="/images/mylogo2.png"
+        alt="Nexora"
+        className="h-full w-full object-cover"
+      />
+    );
+  }
+
+  // ---------- ADMIN → own logo or fallback text ----------
+  if (role === "admin") {
+    const logoUrl = user?.logo?.url;
+
+    if (logoUrl) {
+      return (
+        <img
+          src={logoUrl}
+          alt={user?.name || "Logo"}
+          className={
+            collapsed
+              ? "mx-auto h-9 w-9 shrink-0 rounded-lg object-contain"
+              : "h-full w-auto w-full object-contain"
+          }
+        />
+      );
+    }
+
+    // No logo → text fallback
+    const text = getFallbackLogoText(user);
+
+    return collapsed ? (
+      <div className="mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-sm font-bold text-[var(--action-primary)]">
+        {text.charAt(0).toUpperCase()}
+      </div>
+    ) : (
+      <div className="truncate text-base font-semibold tracking-tight text-primary">
+        {text}
+      </div>
+    );
+  }
+
+  // ---------- MANAGER → Admin's logo (createdBy) ----------
+  if (role === "manager") {
+    const admin = user?.createdBy;
+    const logoUrl = admin?.logo?.url;
+
+    if (logoUrl) {
+      return (
+        <img
+          src={logoUrl}
+          alt={admin?.name || "Logo"}
+          className={
+            collapsed
+              ? "mx-auto h-9 w-9 shrink-0 rounded-lg object-contain"
+              : "h-10 w-auto max-w-full object-contain"
+          }
+        />
+      );
+    }
+
+    // No logo → Admin's fallback text
+    const text = getFallbackLogoText(admin || user);
+
+    return collapsed ? (
+      <div className="mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-sm font-bold text-[var(--action-primary)]">
+        {text.charAt(0).toUpperCase()}
+      </div>
+    ) : (
+      <div className="truncate text-base font-semibold tracking-tight text-primary">
+        {text}
+      </div>
+    );
+  }
+
+  // ---------- Fallback (should rarely happen) ----------
+  return collapsed ? (
+    <img
+      src="/favicon.png"
+      alt="POS"
+      className="mx-auto h-9 w-9 shrink-0 object-contain"
+    />
+  ) : (
+    <img
+      src="/images/nexora3.png"
+      alt="Nexora"
+      className="h-full w-full object-cover"
+    />
+  );
+}
+
+// =====================================================
 // NAV ITEM
 // =====================================================
 
-function NavItem({
-  item,
-  collapsed,
-  onCloseMobile,
-}) {
+function NavItem({ item, collapsed, onCloseMobile }) {
   return (
     <NavLink
       to={
@@ -64,27 +182,17 @@ function NavItem({
         }`
       }
     >
-      {/* Icon */}
-
       <item.icon className="h-4.5 w-4.5 shrink-0" />
-
-      {/* Title */}
 
       {!collapsed && (
         <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-
-          <span className="truncate">
-            {item.title}
-          </span>
-
-          {/* Coming Soon Badge */}
+          <span className="truncate">{item.title}</span>
 
           {item.comingSoon && (
             <span className="shrink-0 rounded-md bg-muted-action px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-secondary">
               Soon
             </span>
           )}
-
         </div>
       )}
     </NavLink>
@@ -105,10 +213,6 @@ function SidebarSection({
 }) {
   const isDashboard = section === "Dashboard";
 
-  // ===================================================
-  // DASHBOARD
-  // ===================================================
-
   if (isDashboard) {
     return (
       <div className="flex flex-col gap-0.5">
@@ -124,14 +228,9 @@ function SidebarSection({
     );
   }
 
-  // ===================================================
-  // COLLAPSED SIDEBAR
-  // ===================================================
-
   if (collapsed) {
     return (
       <div className="flex flex-col gap-0.5">
-
         {items.map((item) => (
           <NavItem
             key={item.path}
@@ -140,22 +239,12 @@ function SidebarSection({
             onCloseMobile={onCloseMobile}
           />
         ))}
-
       </div>
     );
   }
 
-  // ===================================================
-  // NORMAL SIDEBAR
-  // ===================================================
-
   return (
     <div className="flex flex-col">
-
-      {/* =================================================
-          SECTION HEADER
-      ================================================= */}
-
       <button
         type="button"
         onClick={onToggle}
@@ -173,21 +262,13 @@ function SidebarSection({
         )}
       </button>
 
-      {/* =================================================
-          SECTION CONTENT
-      ================================================= */}
-
       <div
         className={`grid transition-[grid-template-rows] duration-200 ${
-          open
-            ? "grid-rows-[1fr]"
-            : "grid-rows-[0fr]"
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
         }`}
       >
         <div className="min-h-0 overflow-hidden">
-
           <div className="mt-1 flex flex-col gap-0.5">
-
             {items.map((item) => (
               <NavItem
                 key={item.path}
@@ -196,12 +277,9 @@ function SidebarSection({
                 onCloseMobile={onCloseMobile}
               />
             ))}
-
           </div>
-
         </div>
       </div>
-
     </div>
   );
 }
@@ -218,37 +296,19 @@ export default function Sidebar({
 }) {
   const { role } = usePermissions();
 
-  // ===================================================
-  // FILTER PAGES BY ROLE
-  // ===================================================
-
   const visiblePages = sidebarConfig.filter((item) =>
     isVisible(item, role)
   );
 
-  // ===================================================
-  // GROUP PAGES
-  // ===================================================
-
   const groupedPages = groupBySection(visiblePages);
-
-  // ===================================================
-  // SECTION OPEN STATES
-  // ===================================================
 
   const [openSections, setOpenSections] = useState(() => {
     const initialState = {};
-
     Object.keys(groupedPages).forEach((section) => {
       initialState[section] = true;
     });
-
     return initialState;
   });
-
-  // ===================================================
-  // TOGGLE SECTION
-  // ===================================================
 
   const toggleSection = (section) => {
     setOpenSections((previous) => ({
@@ -265,36 +325,16 @@ export default function Sidebar({
     <div className="flex h-full flex-col">
 
       {/* =================================================
-          HEADER
+          HEADER – Dynamic Logo
       ================================================= */}
 
       <div className="flex h-16 shrink-0 items-center justify-between border-b border-secondary px-3">
 
-        {/* Logo container – fills available space */}
         <div className="flex min-w-0 flex-1 items-center overflow-hidden">
-
-          {collapsed ? (
-            // Collapsed: square logo, centered
-            <img
-              src="/favicon.png"
-              alt="POS"
-              className="mx-auto h-9 w-9 shrink-0 object-contain"
-            />
-          ) : (
-            // Expanded + Mobile: full logo that fills the header height & width
-            <img
-              src="/images/nexora3.png"
-              alt="Nexora"
-              className="h-full w-auto w-full object-cover "
-            />
-          )}
-
+          <SidebarLogo collapsed={collapsed} />
         </div>
 
-        {/* =================================================
-            MOBILE CLOSE BUTTON
-        ================================================= */}
-
+        {/* Mobile close button */}
         <button
           type="button"
           onClick={onCloseMobile}
@@ -303,7 +343,6 @@ export default function Sidebar({
         >
           <X className="h-5 w-5" />
         </button>
-
       </div>
 
       {/* =================================================
@@ -311,27 +350,19 @@ export default function Sidebar({
       ================================================= */}
 
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-
         <div className="flex flex-col gap-3">
-
-          {Object.entries(groupedPages).map(
-            ([section, items]) => (
-              <SidebarSection
-                key={section}
-                section={section}
-                items={items}
-                collapsed={collapsed}
-                open={openSections[section] ?? true}
-                onToggle={() =>
-                  toggleSection(section)
-                }
-                onCloseMobile={onCloseMobile}
-              />
-            )
-          )}
-
+          {Object.entries(groupedPages).map(([section, items]) => (
+            <SidebarSection
+              key={section}
+              section={section}
+              items={items}
+              collapsed={collapsed}
+              open={openSections[section] ?? true}
+              onToggle={() => toggleSection(section)}
+              onCloseMobile={onCloseMobile}
+            />
+          ))}
         </div>
-
       </nav>
 
       {/* =================================================
@@ -339,15 +370,10 @@ export default function Sidebar({
       ================================================= */}
 
       <div className="hidden shrink-0 border-t border-secondary p-2 md:block">
-
         <button
           type="button"
           onClick={onToggleCollapse}
-          aria-label={
-            collapsed
-              ? "Expand sidebar"
-              : "Collapse sidebar"
-          }
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-secondary transition-colors hover:bg-muted-action"
         >
           {collapsed ? (
@@ -356,52 +382,35 @@ export default function Sidebar({
             <ChevronsLeft className="h-4.5 w-4.5" />
           )}
         </button>
-
       </div>
-
     </div>
   );
 
   // =====================================================
-  // RETURN SIDEBAR
+  // RETURN
   // =====================================================
 
   return (
     <>
-      {/* =================================================
-          DESKTOP SIDEBAR
-      ================================================= */}
-
+      {/* Desktop Sidebar */}
       <aside
         className={`sticky top-0 hidden h-screen shrink-0 border-r border-secondary bg-card transition-all duration-200 md:block ${
-          collapsed
-            ? "w-[72px]"
-            : "w-64"
+          collapsed ? "w-[72px]" : "w-64"
         }`}
       >
         {content}
       </aside>
 
-      {/* =================================================
-          MOBILE SIDEBAR
-      ================================================= */}
-
+      {/* Mobile Sidebar */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
-
-          {/* Overlay */}
-
           <div
             className="absolute inset-0 bg-black/50"
             onClick={onCloseMobile}
           />
-
-          {/* Drawer */}
-
           <aside className="relative h-full w-72 bg-card shadow-xl animate-fade-up">
             {content}
           </aside>
-
         </div>
       )}
     </>

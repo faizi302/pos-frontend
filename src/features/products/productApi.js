@@ -56,8 +56,6 @@ export const productsApi = baseApi.injectEndpoints({
     // ==================================================
     // CREATE PRODUCT
     // POST /api/products  (JSON or FormData with field "images")
-    // Admin body: category, brand, model?, name?, sku, salePrice, ...
-    // Super Admin may also send tenantOwner / business / businessType
     // ==================================================
     createProduct: builder.mutation({
       query: (body) => {
@@ -81,7 +79,6 @@ export const productsApi = baseApi.injectEndpoints({
     // UPDATE PRODUCT
     // PATCH /api/products/:id
     // Arg: { id, body } where body is JSON object or FormData
-    // FormData may include "images" and "removeImages"
     // ==================================================
     updateProduct: builder.mutation({
       query: ({ id, body }) => {

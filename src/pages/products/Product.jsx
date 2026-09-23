@@ -33,11 +33,6 @@ const PERMISSIONS = {
   DELETE: "products.delete",
 };
 
-const formatMoney = (value) =>
-  `Rs ${Number(value || 0).toLocaleString("en-PK", {
-    maximumFractionDigits: 2,
-  })}`;
-
 const toTitleCase = (value = "") =>
   String(value)
     .trim()
@@ -53,6 +48,8 @@ export default function Product() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [productTypeFilter, setProductTypeFilter] = useState("all");
+  const [trackSerialFilter, setTrackSerialFilter] = useState("all");
   const [page, setPage] = useState(1);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -60,15 +57,15 @@ export default function Product() {
   const [viewing, setViewing] = useState(null);
 
   const queryArgs = useMemo(() => {
-    const params = {
-      page,
-      limit: 20,
-    };
+    const params = { page, limit: 20 };
     if (search.trim()) params.search = search.trim();
     if (statusFilter === "active") params.isActive = true;
     if (statusFilter === "inactive") params.isActive = false;
+    if (productTypeFilter !== "all") params.productType = productTypeFilter;
+    if (trackSerialFilter === "yes") params.trackSerial = true;
+    if (trackSerialFilter === "no") params.trackSerial = false;
     return params;
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, productTypeFilter, trackSerialFilter]);
 
   const {
     data,
@@ -79,10 +76,8 @@ export default function Product() {
     refetch,
   } = useGetProductsQuery(queryArgs);
 
-  const [deleteProduct, { isLoading: isDeleting }] =
-    useDeleteProductMutation();
-  const [restoreProduct, { isLoading: isRestoring }] =
-    useRestoreProductMutation();
+  const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
+  const [restoreProduct, { isLoading: isRestoring }] = useRestoreProductMutation();
 
   const products = useMemo(() => {
     if (Array.isArray(data?.products)) return data.products;
@@ -170,7 +165,7 @@ export default function Product() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
           title="Products"
-          description="Manage products, pricing, brands, models and serial tracking."
+          description="Manage products, brands, models and serial tracking."
         />
         {canCreate && (
           <Link to="/products/create">
@@ -182,32 +177,19 @@ export default function Product() {
         )}
       </div>
 
+      {/* Summary cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          title="Total (page)"
-          value={pagination.total ?? products.length}
-          icon={Package}
-        />
+        <SummaryCard title="Total (page)" value={pagination.total ?? products.length} icon={Package} />
         <SummaryCard title="Active (page)" value={activeCount} icon={Package} />
-        <SummaryCard
-          title="Inactive (page)"
-          value={inactiveCount}
-          icon={Package}
-        />
-        <SummaryCard
-          title="Serial / IMEI"
-          value={serialCount}
-          icon={Smartphone}
-        />
+        <SummaryCard title="Inactive (page)" value={inactiveCount} icon={Package} />
+        <SummaryCard title="Serial / IMEI" value={serialCount} icon={Smartphone} />
       </div>
 
+      {/* Filters */}
       <div className="rounded-2xl border border-primary bg-card p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-md">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary"
-            />
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary" />
             <input
               type="text"
               value={search}
@@ -220,7 +202,7 @@ export default function Product() {
             />
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
             <select
               value={statusFilter}
               onChange={(e) => {
@@ -234,80 +216,71 @@ export default function Product() {
               <option value="inactive">Inactive</option>
             </select>
 
+            <select
+              value={productTypeFilter}
+              onChange={(e) => {
+                setProductTypeFilter(e.target.value);
+                setPage(1);
+              }}
+              className="h-11 rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none focus:border-brand"
+            >
+              <option value="all">All types</option>
+              <option value="simple">Simple</option>
+              <option value="variable">Variable</option>
+              <option value="service">Service</option>
+              <option value="digital">Digital</option>
+              <option value="bundle">Bundle</option>
+            </select>
+
+            <select
+              value={trackSerialFilter}
+              onChange={(e) => {
+                setTrackSerialFilter(e.target.value);
+                setPage(1);
+              }}
+              className="h-11 rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none focus:border-brand"
+            >
+              <option value="all">Serial tracking</option>
+              <option value="yes">Tracked</option>
+              <option value="no">Not tracked</option>
+            </select>
+
             <button
               type="button"
               onClick={() => refetch()}
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-primary bg-surface px-4 text-sm font-medium text-primary transition hover:bg-muted-action"
             >
-              <RefreshCw
-                size={17}
-                className={isFetching ? "animate-spin" : ""}
-              />
+              <RefreshCw size={17} className={isFetching ? "animate-spin" : ""} />
               Refresh
             </button>
-
-            {canCreate && (
-              <Link to="/products/create" className="hidden sm:inline-flex">
-                <Button className="inline-flex h-11 items-center gap-2">
-                  <Plus size={17} />
-                  Add Product
-                </Button>
-              </Link>
-            )}
           </div>
         </div>
       </div>
 
-      <div
-        className={`min-w-0 overflow-hidden rounded-2xl border border-primary bg-card shadow-sm ${
-          isFetching ? "opacity-80" : ""
-        }`}
-      >
+      {/* Table */}
+      <div className={`min-w-0 overflow-hidden rounded-2xl border border-primary bg-card shadow-sm ${isFetching ? "opacity-80" : ""}`}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="border-b border-secondary bg-surface">
               <tr>
-                <th className="px-5 py-4 text-left font-semibold text-primary">
-                  Product
-                </th>
-                <th className="px-5 py-4 text-left font-semibold text-primary">
-                  SKU
-                </th>
-                <th className="px-5 py-4 text-left font-semibold text-primary">
-                  Brand / Model
-                </th>
-                <th className="px-5 py-4 text-left font-semibold text-primary">
-                  Type
-                </th>
-                <th className="px-5 py-4 text-right font-semibold text-primary">
-                  Purchase
-                </th>
-                <th className="px-5 py-4 text-right font-semibold text-primary">
-                  Sale
-                </th>
-                <th className="px-5 py-4 text-center font-semibold text-primary">
-                  Status
-                </th>
-                <th className="px-5 py-4 text-right font-semibold text-primary">
-                  Actions
-                </th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">Product</th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">SKU</th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">Brand / Model</th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">Type</th>
+                <th className="px-5 py-4 text-center font-semibold text-primary">Status</th>
+                <th className="px-5 py-4 text-right font-semibold text-primary">Actions</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-[var(--border-secondary-color)]">
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-16 text-center">
-                    <Package
-                      size={42}
-                      className="mx-auto mb-3 text-secondary"
-                    />
-                    <h3 className="text-base font-semibold text-primary">
-                      No products found
-                    </h3>
+                  <td colSpan={6} className="px-5 py-16 text-center">
+                    <Package size={42} className="mx-auto mb-3 text-secondary" />
+                    <h3 className="text-base font-semibold text-primary">No products found</h3>
                     <p className="mt-1 text-sm text-secondary">
-                      {search || statusFilter !== "all"
-                        ? "Try a different search or status filter."
+                      {search || statusFilter !== "all" || productTypeFilter !== "all"
+                        ? "Try a different search or filter."
                         : "Create your first product to get started."}
                     </p>
                     {canCreate && (
@@ -322,10 +295,7 @@ export default function Product() {
                 </tr>
               ) : (
                 products.map((product) => (
-                  <tr
-                    key={product._id}
-                    className="transition hover:bg-surface"
-                  >
+                  <tr key={product._id} className="transition hover:bg-surface">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-primary bg-surface">
@@ -337,10 +307,7 @@ export default function Product() {
                             />
                           ) : (
                             <div className="flex h-full w-full items-center justify-center">
-                              <Package
-                                size={18}
-                                className="text-secondary"
-                              />
+                              <Package size={18} className="text-secondary" />
                             </div>
                           )}
                         </div>
@@ -375,14 +342,6 @@ export default function Product() {
 
                     <td className="px-5 py-4 capitalize text-secondary">
                       {product.productType || "simple"}
-                    </td>
-
-                    <td className="px-5 py-4 text-right text-primary">
-                      {formatMoney(product.purchasePrice)}
-                    </td>
-
-                    <td className="px-5 py-4 text-right font-semibold text-primary">
-                      {formatMoney(product.salePrice)}
                     </td>
 
                     <td className="px-5 py-4 text-center">
@@ -451,8 +410,7 @@ export default function Product() {
         {pagination.totalPages > 1 && (
           <div className="flex flex-col gap-4 border-t border-secondary px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <p className="text-center text-sm text-secondary sm:text-left">
-              Page {pagination.page} of {pagination.totalPages} ·{" "}
-              {pagination.total} total
+              Page {pagination.page} of {pagination.totalPages} · {pagination.total} total
             </p>
             <div className="flex w-full gap-2 sm:w-auto">
               <button
@@ -491,7 +449,7 @@ export default function Product() {
         title="Deactivate product?"
         description={
           deleteTarget
-            ? `"${toTitleCase(deleteTarget.name || "")}" will be set inactive (soft delete). You can restore it later from the Inactive filter.`
+            ? `"${toTitleCase(deleteTarget.name || "")}" will be set inactive. You can restore it later.`
             : "Are you sure?"
         }
         confirmText="Deactivate"
@@ -506,7 +464,7 @@ export default function Product() {
         title="Restore product?"
         description={
           restoreTarget
-            ? `Restore "${toTitleCase(restoreTarget.name || "")}" and its inventory?`
+            ? `Restore "${toTitleCase(restoreTarget.name || "")}"?`
             : "Are you sure?"
         }
         confirmText="Restore"
@@ -570,43 +528,17 @@ function ProductDetailsModal({ product, canUpdate, onClose }) {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <DetailItem label="Name" value={toTitleCase(product.name || "")} />
-            <DetailItem label="SKU" value={product.sku} />
-            <DetailItem
-              label="Brand"
-              value={toTitleCase(product?.brand?.name || "") || "—"}
-            />
-            <DetailItem
-              label="Model"
-              value={toTitleCase(product?.model?.name || "") || "—"}
-            />
-            <DetailItem
-              label="Category"
-              value={product?.category?.name || "—"}
-            />
-            <DetailItem label="Type" value={product.productType} />
-            <DetailItem label="Unit" value={product.unit} />
-            <DetailItem
-              label="Serial tracking"
-              value={product.trackSerial ? "Yes (IMEI)" : "No"}
-            />
-            <DetailItem
-              label="Purchase price"
-              value={formatMoney(product.purchasePrice)}
-            />
-            <DetailItem
-              label="Sale price"
-              value={formatMoney(product.salePrice)}
-            />
-            <DetailItem label="Discount" value={`${product.discount || 0}%`} />
-            <DetailItem label="Tax" value={product.tax || 0} />
-            <DetailItem
-              label="Status"
-              value={product.isActive ? "Active" : "Inactive"}
-            />
-            <DetailItem
-              label="Featured"
-              value={product.isFeatured ? "Yes" : "No"}
-            />
+            <DetailItem label="SKU" value={product.sku || "—"} />
+            <DetailItem label="Slug" value={product.slug || "—"} />
+            <DetailItem label="Brand" value={toTitleCase(product?.brand?.name || "") || "—"} />
+            <DetailItem label="Model" value={toTitleCase(product?.model?.name || "") || "—"} />
+            <DetailItem label="Category" value={product?.category?.name || "—"} />
+            <DetailItem label="Type" value={product.productType || "simple"} />
+            <DetailItem label="Unit" value={product.unit || "piece"} />
+            <DetailItem label="Barcode" value={product.barcode || "—"} />
+            <DetailItem label="Serial tracking" value={product.trackSerial ? "Yes (IMEI)" : "No"} />
+            <DetailItem label="Status" value={product.isActive ? "Active" : "Inactive"} />
+            <DetailItem label="Featured" value={product.isFeatured ? "Yes" : "No"} />
           </div>
         </div>
 

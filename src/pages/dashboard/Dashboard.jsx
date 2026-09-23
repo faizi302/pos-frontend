@@ -2,8 +2,6 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Users,
-  UserCheck,
-  UserX,
   Building2,
   Layers3,
   Tags,
@@ -24,8 +22,10 @@ import {
   ArrowUpRight,
   Plus,
   Clock,
-  Wallet,
   Info,
+  Smartphone,
+  PiggyBank,
+  Store,
 } from "lucide-react";
 
 import { usePermissions } from "@/hooks/usePermissions";
@@ -47,6 +47,7 @@ import { useGetAllSalePaymentsQuery } from "@/features/sales/salePaymentApi";
 import { useGetProductsQuery } from "@/features/products/productApi";
 import { useGetCustomersQuery } from "@/features/customer/customerApi";
 import { useGetCurrentCashRegisterQuery } from "@/features/cashRegister/cashRegisterApi";
+import { useGetExpensesQuery } from "@/features/expense/expenseApi";
 
 /* =====================================================================
    THEME-AWARE TONES
@@ -247,6 +248,15 @@ const METHOD_TONE = {
   other: "cyan",
 };
 
+// "Online / digital" bucket — everything that isn't physical cash in hand.
+// Covers bank transfers, cards, and wallets like JazzCash / Easypaisa, which
+// this backend records under "bank", "card" or "other". "Credit" is a
+// deferred balance rather than money actually received, so it's excluded
+// from both cash and online collected totals.
+const ONLINE_METHODS = new Set(["bank", "card", "cheque", "other", "jazzcash", "easypaisa", "wallet", "online"]);
+const isCashMethod = (m) => String(m || "").toLowerCase() === "cash";
+const isOnlineMethod = (m) => ONLINE_METHODS.has(String(m || "").toLowerCase());
+
 /* =====================================================================
    SMALL UI PIECES
 ===================================================================== */
@@ -376,37 +386,44 @@ function StatCard({
 }) {
   const card = (
     <div
-      className="group relative h-full animate-fade-up overflow-hidden rounded-2xl border border-secondary bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:p-5"
+      className="group relative h-full animate-fade-up overflow-hidden rounded-2xl border border-secondary bg-card p-4 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-5"
       style={{
         animationDelay: `${delay}ms`,
-        backgroundImage: `radial-gradient(120% 100% at 100% 0%, ${tint(tone, 16)}, transparent 62%)`,
+        backgroundImage: `linear-gradient(150deg, ${tint(tone, 22)} 0%, transparent 55%)`,
         boxShadow: attention ? `0 0 0 1.5px ${tint(tone, 55)}` : undefined,
       }}
     >
-      <div className="flex items-start justify-between gap-2">
+      {/* soft decorative blob, purely cosmetic */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-70 blur-2xl transition-transform duration-300 group-hover:scale-110"
+        style={{ background: tint(tone, 35) }}
+      />
+
+      <div className="relative flex items-start justify-between gap-2">
         <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl"
-          style={{ background: tint(tone, 18), color: TONES[tone] }}
+          className="flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm"
+          style={{ background: TONES[tone], color: "#fff" }}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-6 w-6" />
         </div>
         <DeltaPill value={delta} />
       </div>
 
-      <p className="mt-4 text-[13px] text-secondary">{label}</p>
+      <p className="relative mt-4 text-[13px] font-medium text-secondary">{label}</p>
 
-      <div className="mt-1 flex items-end justify-between gap-2">
+      <div className="relative mt-1 flex items-end justify-between gap-2">
         {loading ? (
           <Sk className="h-8 w-24" />
         ) : (
-          <p className="min-w-0 truncate text-2xl font-semibold tabular-nums tracking-tight text-primary">
+          <p className="min-w-0 truncate text-[26px] font-bold tabular-nums leading-tight tracking-tight text-primary">
             {value}
           </p>
         )}
         {!loading && spark && <Sparkline values={spark} tone={tone} />}
       </div>
 
-      {hint && !loading && <p className="mt-1 truncate text-xs text-secondary">{hint}</p>}
+      {hint && !loading && <p className="relative mt-1.5 truncate text-xs text-secondary">{hint}</p>}
     </div>
   );
 
@@ -708,7 +725,7 @@ function RangeTabs({ value, onChange, options }) {
             value === o ? "bg-brand text-white shadow-sm" : "text-secondary hover:text-primary"
           }`}
         >
-          {o}d
+          {o === 1 ? "Today" : `${o}d`}
         </button>
       ))}
     </div>
@@ -966,7 +983,15 @@ export default function Dashboard() {
   const allow = (...perms) => perms.some((p) => can(p));
 
   const [rangeDays, setRangeDays] = useState(isManager ? 7 : 30);
-  const rangeOptions = isManager ? [7, 14, 30] : [7, 30, 90];
+  // 1 stands for "Today" — every calculation below already treats a range
+  // of 1 day as "from the start of today", so Today just reuses the same
+  // pipeline instead of needing a separate code path.
+  // Manager gets Today/7d (their view is day-to-day shift work); Admin
+  // additionally gets 30d for a monthly picture.
+  const rangeOptions = isManager ? [1, 7] : [1, 7, 30];
+  const isToday = rangeDays === 1;
+  const rangeText = isToday ? "today" : `last ${rangeDays} days`;
+  const rangeTextCap = isToday ? "Today" : `Last ${rangeDays} days`;
 
   // ---------- what this role is allowed to load ----------
   const en = {
@@ -982,6 +1007,7 @@ export default function Dashboard() {
     products: (isAdmin || isManager) && allow("products.read"),
     customers: (isAdmin || isManager) && allow("customers.read"),
     register: isAdmin || isManager,
+    expenses: isAdmin && allow("expenses.read"),
   };
 
   // ---------- Super Admin queries ----------
@@ -1001,6 +1027,7 @@ export default function Dashboard() {
   const productsQ = useGetProductsQuery({}, { skip: !en.products });
   const customersQ = useGetCustomersQuery({ page: 1, limit: 100 }, { skip: !en.customers });
   const registerQ = useGetCurrentCashRegisterQuery(undefined, { skip: !en.register });
+  const expensesQ = useGetExpensesQuery({ page: 1, limit: 200 }, { skip: !en.expenses });
 
   const allQueries = [
     [usersQ, en.admins],
@@ -1015,6 +1042,7 @@ export default function Dashboard() {
     [productsQ, en.products],
     [customersQ, en.customers],
     [registerQ, en.register],
+    [expensesQ, en.expenses],
   ];
   const refreshing = allQueries.some(([q, on]) => on && q.isFetching);
 
@@ -1227,6 +1255,67 @@ export default function Dashboard() {
       }));
   }, [paymentsQ.data, rangeDays]);
 
+  // Cash vs online split for the selected range — powers the
+  // "Cash payments" / "Online payments" / "Revenue" / "Profit" cards.
+  const collections = useMemo(() => {
+    const list = toArray(paymentsQ.data, "payments", "salePayments");
+    const from = addDays(startOfDay(new Date()), -(rangeDays - 1)).getTime();
+    let cash = 0;
+    let online = 0;
+    list.forEach((p) => {
+      const st = String(p?.status || "completed").toLowerCase();
+      if (["failed", "cancelled", "pending"].includes(st)) return;
+      const t = ts(p, "paymentDate", "createdAt");
+      if (t && t < from) return;
+      const amount = Number(p?.amount) || 0;
+      const method = p?.paymentMethod;
+      if (isCashMethod(method)) cash += amount;
+      else if (isOnlineMethod(method)) online += amount;
+    });
+    return { cash, online, revenue: cash + online };
+  }, [paymentsQ.data, rangeDays]);
+
+  // Profit = money actually collected (cash + online) minus the cost of
+  // goods sold in the same window (quantity × product purchase price) and
+  // minus paid expenses in that window. This mirrors real cash profit
+  // rather than accrual-based revenue, which fits a POS/cash-register flow.
+  const productCostMap = useMemo(() => {
+    const products = toArray(productsQ.data, "products");
+    const map = new Map();
+    products.forEach((p) => map.set(String(p._id), Number(p.purchasePrice) || 0));
+    return map;
+  }, [productsQ.data]);
+
+  const profit = useMemo(() => {
+    if (!en.expenses) return null;
+    const from = addDays(startOfDay(new Date()), -(rangeDays - 1)).getTime();
+
+    const items = toArray(itemsQ.data, "saleItems");
+    let cogs = 0;
+    items.forEach((it) => {
+      const t = ts(it, "createdAt");
+      if (t && t < from) return;
+      const pid = it?.product?._id || (typeof it?.product === "string" ? it.product : undefined);
+      const cost = pid ? productCostMap.get(String(pid)) || 0 : 0;
+      cogs += cost * (Number(it?.quantity) || 0);
+    });
+
+    const expensesList = toArray(expensesQ.data, "expenses");
+    const paidExpenses = expensesList
+      .filter((e) => String(e?.status).toLowerCase() === "paid")
+      .filter((e) => {
+        const t = ts(e, "expenseDate", "createdAt");
+        return !t || t >= from;
+      })
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    return {
+      cogs,
+      expenses: paidExpenses,
+      net: collections.revenue - cogs - paidExpenses,
+    };
+  }, [en.expenses, itemsQ.data, expensesQ.data, productCostMap, collections.revenue, rangeDays]);
+
   const catalog = useMemo(() => {
     const products = toArray(productsQ.data, "products");
     const active = products.filter((p) => p?.isActive !== false).length;
@@ -1321,38 +1410,38 @@ export default function Dashboard() {
   let kpis = [];
 
   if (isSA && platform) {
+    // Exactly 4 cards for Super Admin: platform-wide business health.
+    const pendingBusinesses = platform.businesses.length - platform.activeBusinesses;
     kpis = [
-      { icon: Building2, label: "Businesses", value: platform.businesses.length, hint: `${platform.activeBusinesses} active`, tone: "blue", loading: businessesQ.isLoading, to: "/businesses" },
-      { icon: Layers3, label: "Business types", value: platform.types.length, hint: "Across all businesses", tone: "violet", loading: typesQ.isLoading, to: "/business-types" },
-      { icon: Tags, label: "Brands", value: platform.brands.length, hint: "Registered brands", tone: "pink", loading: brandsQ.isLoading, to: "/brands" },
-      { icon: Boxes, label: "Models", value: platform.models.length, hint: "Product models", tone: "cyan", loading: modelsQ.isLoading, to: "/models" },
-      { icon: Users, label: "Admin accounts", value: platform.admins.length, hint: "Business owners", tone: "brand", loading: usersQ.isLoading, to: "/users" },
-      { icon: UserCheck, label: "Active admins", value: platform.activeAdmins, hint: platform.admins.length ? `${Math.round((platform.activeAdmins / platform.admins.length) * 100)}% of all admins` : "—", tone: "green", loading: usersQ.isLoading },
-      { icon: Hourglass, label: "Pending approval", value: platform.pendingAdmins, hint: platform.pendingAdmins ? "Needs your review" : "All caught up", tone: "amber", loading: usersQ.isLoading, to: "/users", attention: platform.pendingAdmins > 0 },
-      { icon: UserX, label: "Suspended / rejected", value: platform.blockedAdmins, hint: "Blocked accounts", tone: "red", loading: usersQ.isLoading, to: "/users" },
+      { icon: Building2, label: "Total Businesses", value: platform.businesses.length, hint: "All registered businesses", tone: "blue", loading: businessesQ.isLoading, to: "/businesses" },
+      { icon: Store, label: "Active Businesses", value: platform.activeBusinesses, hint: platform.businesses.length ? `${Math.round((platform.activeBusinesses / platform.businesses.length) * 100)}% of total` : "—", tone: "green", loading: businessesQ.isLoading, to: "/businesses" },
+      { icon: Hourglass, label: "Pending Businesses", value: pendingBusinesses, hint: pendingBusinesses ? "Awaiting activation" : "All activated", tone: "amber", loading: businessesQ.isLoading, to: "/businesses", attention: pendingBusinesses > 0 },
+      { icon: Users, label: "Admin Accounts", value: platform.admins.length, hint: `${platform.pendingAdmins} pending approval`, tone: "violet", loading: usersQ.isLoading, to: "/users", attention: platform.pendingAdmins > 0 },
     ];
   } else if (isAdmin && analytics) {
+    // Exactly 4 cards for Admin: cash / online / total revenue / profit.
     kpis = [
-      en.sales && { icon: CircleDollarSign, label: `Revenue (${rangeDays}d)`, value: moneyFit(analytics.range.revenue), hint: `${money(analytics.range.collected)} collected`, tone: "green", loading: salesLoading, spark: analytics.days.map((d) => d.revenue), delta: analytics.deltaRevenue, to: "/sales" },
-      en.sales && { icon: Wallet, label: "Today's revenue", value: moneyFit(analytics.todayRec.revenue), hint: `${analytics.todayRec.count} order${analytics.todayRec.count === 1 ? "" : "s"} today`, tone: "brand", loading: salesLoading, delta: analytics.deltaToday, to: "/sales" },
-      en.sales && { icon: Receipt, label: `Orders (${rangeDays}d)`, value: NUM.format(analytics.range.count), hint: "Completed & active sales", tone: "blue", loading: salesLoading, spark: analytics.days.map((d) => d.count), delta: analytics.deltaCount, to: "/sales" },
-      en.sales && { icon: Banknote, label: "Avg. order value", value: moneyFit(avg(analytics.range.revenue, analytics.range.count)), hint: `Last ${rangeDays} days`, tone: "violet", loading: salesLoading },
-      en.sales && { icon: Hourglass, label: "Outstanding dues", value: moneyFit(analytics.dues), hint: `${analytics.dueCount} sale${analytics.dueCount === 1 ? "" : "s"} with balance`, tone: "red", loading: salesLoading, to: "/sales" },
-      en.customers && { icon: UsersRound, label: "Customers", value: NUM.format(customers.total), hint: `${customers.newThisMonth} new this month`, tone: "cyan", loading: customersQ.isLoading, to: "/customers" },
-      en.products && { icon: Package, label: "Active products", value: NUM.format(catalog.active), hint: `${catalog.total} in catalog`, tone: "pink", loading: productsQ.isLoading, to: "/products" },
-      en.managers && { icon: Users, label: "Managers", value: NUM.format(managers.length), hint: `${managers.filter((m) => String(m.status).toLowerCase() === "active").length} active`, tone: "amber", loading: managersQ.isLoading, to: "/users" },
+      { icon: Banknote, label: "Cash Payments", value: moneyFit(collections.cash), hint: rangeTextCap, tone: "green", loading: paymentsQ.isLoading, to: "/sale-payments" },
+      { icon: Smartphone, label: "Online Payments", value: moneyFit(collections.online), hint: "JazzCash, Easypaisa, card & bank", tone: "blue", loading: paymentsQ.isLoading, to: "/sale-payments" },
+      { icon: CircleDollarSign, label: "Total Revenue", value: moneyFit(collections.revenue), hint: "Cash + online collected", tone: "brand", loading: paymentsQ.isLoading, spark: analytics.days.map((d) => d.revenue), delta: analytics.deltaRevenue, to: "/sales" },
+      profit && {
+        icon: PiggyBank,
+        label: "Profit",
+        value: moneyFit(profit.net),
+        hint: `After ${moneyFit(profit.cogs)} cost & ${moneyFit(profit.expenses)} expenses`,
+        tone: profit.net >= 0 ? "violet" : "red",
+        loading: itemsQ.isLoading || expensesQ.isLoading,
+        to: "/expenses",
+      },
     ].filter(Boolean);
   } else if (isManager && analytics) {
+    // Exactly 4 cards for Manager: cash / online / total / register balance.
     kpis = [
-      en.sales && { icon: Wallet, label: "Today's revenue", value: moneyFit(analytics.todayRec.revenue), hint: "vs. yesterday", tone: "brand", loading: salesLoading, delta: analytics.deltaToday, to: "/sales" },
-      en.sales && { icon: Receipt, label: "Today's orders", value: NUM.format(analytics.todayRec.count), hint: `${analytics.yRec.count} yesterday`, tone: "blue", loading: salesLoading, delta: analytics.deltaTodayCount, to: "/sales" },
-      en.sales && { icon: Banknote, label: "Avg. ticket today", value: moneyFit(avg(analytics.todayRec.revenue, analytics.todayRec.count)), hint: "Per order", tone: "violet", loading: salesLoading },
-      en.sales && { icon: CircleDollarSign, label: "Collected today", value: moneyFit(analytics.todayRec.collected), hint: "Payments received", tone: "green", loading: salesLoading },
-      en.sales && { icon: Hourglass, label: "Outstanding dues", value: moneyFit(analytics.dues), hint: `${analytics.dueCount} to collect`, tone: "red", loading: salesLoading, to: "/sales" },
-      { icon: Landmark, label: "Register balance", value: registerExpected === null ? "Closed" : moneyFit(registerExpected), hint: registerExpected === null ? "Open a register to start" : "Expected in drawer", tone: "cyan", loading: registerQ.isLoading, to: "/cash-register" },
-      en.customers && { icon: UsersRound, label: "Customers", value: NUM.format(customers.total), hint: `${customers.newThisMonth} new this month`, tone: "pink", loading: customersQ.isLoading, to: "/customers" },
-      en.products && { icon: Package, label: "Active products", value: NUM.format(catalog.active), hint: `${catalog.total} in catalog`, tone: "amber", loading: productsQ.isLoading, to: "/products" },
-    ].filter(Boolean);
+      { icon: Banknote, label: "Cash Payments", value: moneyFit(collections.cash), hint: rangeTextCap, tone: "green", loading: paymentsQ.isLoading, to: "/sale-payments" },
+      { icon: Smartphone, label: "Online Payments", value: moneyFit(collections.online), hint: "JazzCash, Easypaisa, card & bank", tone: "blue", loading: paymentsQ.isLoading, to: "/sale-payments" },
+      { icon: CircleDollarSign, label: "Total Cash Collected", value: moneyFit(collections.revenue), hint: "Cash + online", tone: "brand", loading: paymentsQ.isLoading, delta: analytics.deltaToday, to: "/sales" },
+      { icon: Landmark, label: "Register Balance", value: registerExpected === null ? "Closed" : moneyFit(registerExpected), hint: registerExpected === null ? "Open a register to start" : "Expected in drawer", tone: "cyan", loading: registerQ.isLoading, to: "/cash-register" },
+    ];
   }
 
   const registerUnavailable = registerQ.isError && registerQ.error?.status !== 404;
@@ -1378,7 +1467,7 @@ export default function Dashboard() {
         </div>
 
         <div className="flex items-center gap-2">
-          {(isAdmin || isManager) && en.sales && (
+          {(isAdmin || isManager) && (en.sales || en.payments) && (
             <RangeTabs value={rangeDays} onChange={setRangeDays} options={rangeOptions} />
           )}
           <button
@@ -1549,7 +1638,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
               <Panel
                 title="Revenue vs collected"
-                subtitle={`Daily, last ${rangeDays} days`}
+                subtitle={`Daily, ${rangeText}`}
                 action={<Legend items={[{ name: "Revenue", tone: "green" }, { name: "Collected", tone: "brand" }]} />}
                 className="xl:col-span-2"
                 delay={80}
@@ -1569,7 +1658,7 @@ export default function Dashboard() {
                 )}
               </Panel>
 
-              <Panel title="Sales by payment status" subtitle={`Last ${rangeDays} days`} delay={120}>
+              <Panel title="Sales by payment status" subtitle={rangeTextCap} delay={120}>
                 <Donut segments={analytics.payStatusSegments} centerValue={analytics.range.count} centerLabel="orders" />
               </Panel>
             </div>
@@ -1577,17 +1666,17 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {en.items && (
-              <Panel title="Top products" subtitle={`By revenue, last ${rangeDays} days`} action={<PanelLink to="/sale-items">Details</PanelLink>} delay={140}>
+              <Panel title="Top products" subtitle={`By revenue, ${rangeText}`} action={<PanelLink to="/sale-items">Details</PanelLink>} delay={140}>
                 {itemsQ.isLoading ? <Sk className="h-40 w-full" /> : <HBars items={topProducts} tone="pink" format={moneyFit} />}
               </Panel>
             )}
             {en.sales && (
-              <Panel title="Top customers" subtitle={`By spend, last ${rangeDays} days`} action={<PanelLink to="/customers">Customers</PanelLink>} delay={160}>
+              <Panel title="Top customers" subtitle={`By spend, ${rangeText}`} action={<PanelLink to="/customers">Customers</PanelLink>} delay={160}>
                 {salesLoading ? <Sk className="h-40 w-full" /> : <HBars items={analytics.topCustomers} tone="cyan" format={moneyFit} />}
               </Panel>
             )}
             {en.payments && (
-              <Panel title="Payment methods" subtitle={`Money received, last ${rangeDays} days`} delay={180}>
+              <Panel title="Payment methods" subtitle={`Money received, ${rangeText}`} delay={180}>
                 {paymentsQ.isLoading ? (
                   <Sk className="h-40 w-full" />
                 ) : (
@@ -1614,7 +1703,7 @@ export default function Dashboard() {
               </Panel>
             )}
             {en.sales && (
-              <Panel title="Orders per day" subtitle={`Last ${Math.min(rangeDays, 14)} days`} className="h-full" delay={220}>
+              <Panel title="Orders per day" subtitle={isToday ? "Today" : `Last ${Math.min(rangeDays, 14)} days`} className="h-full" delay={220}>
                 <BarColumns
                   data={analytics.days.slice(-Math.min(rangeDays, 14)).map((d) => ({ label: d.label, value: d.count }))}
                   tone="blue"
@@ -1645,7 +1734,7 @@ export default function Dashboard() {
             {en.sales && (
               <Panel
                 title="Sales trend"
-                subtitle={`Daily revenue, last ${rangeDays} days`}
+                subtitle={`Daily revenue, ${rangeText}`}
                 action={<Legend items={[{ name: "Revenue", tone: "green" }, { name: "Collected", tone: "brand" }]} />}
                 className="xl:col-span-2"
                 delay={120}
@@ -1666,7 +1755,7 @@ export default function Dashboard() {
               </Panel>
             )}
             {en.payments && (
-              <Panel title="Payment methods" subtitle={`Money received, last ${rangeDays} days`} delay={140}>
+              <Panel title="Payment methods" subtitle={`Money received, ${rangeText}`} delay={140}>
                 {paymentsQ.isLoading ? (
                   <Sk className="h-40 w-full" />
                 ) : (
@@ -1683,7 +1772,7 @@ export default function Dashboard() {
               </div>
             )}
             {en.items && (
-              <Panel title="Best sellers" subtitle={`By revenue, last ${rangeDays} days`} action={<PanelLink to="/sale-items">Details</PanelLink>} className="h-full" delay={180}>
+              <Panel title="Best sellers" subtitle={`By revenue, ${rangeText}`} action={<PanelLink to="/sale-items">Details</PanelLink>} className="h-full" delay={180}>
                 {itemsQ.isLoading ? <Sk className="h-40 w-full" /> : <HBars items={topProducts} tone="pink" format={moneyFit} />}
               </Panel>
             )}

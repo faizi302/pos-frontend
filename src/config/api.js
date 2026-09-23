@@ -25,6 +25,9 @@ export const API_ROUTES = {
   products: "/products",
   productInventory: "/products-Inventory",
 
+  // Inventory Units (serial / IMEI tracked items)
+  inventoryUnits: "/inventory-units",
+
   // Customers
   customers: "/customers",
 
@@ -36,7 +39,7 @@ export const API_ROUTES = {
   saleItems: "/sale-item",
   salePayments: "/sale-payment",
 
-   payments: "/payment",
+  payments: "/payment",
 
   // Expenses
   expenses: "/expense",
