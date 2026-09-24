@@ -50,7 +50,6 @@ const toTitleCase = (str = "") => {
 };
 
 const getProductName = (p) => p?.name || "Unknown Product";
-const getProductSku = (p) => p?.sku || "—";
 const getProductBrand = (p) =>
   typeof p?.brand === "object" ? p.brand?.name || "—" : p?.brand || "—";
 const getProductModel = (p) =>
@@ -85,7 +84,9 @@ const getStockStatus = (item) => {
 };
 
 const formatMoney = (v) =>
-  `Rs ${Number(v || 0).toLocaleString("en-PK", { maximumFractionDigits: 2 })}`;
+  `Rs ${Number(v || 0).toLocaleString("en-PK", {
+    maximumFractionDigits: 2,
+  })}`;
 
 // ======================================================
 // MAIN COMPONENT
@@ -98,7 +99,8 @@ export default function ProductInventory() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingInventory, setEditingInventory] = useState(null);
-  const [selectedInventory, setSelectedInventory] = useState(null);
+  const [selectedInventory, setSelectedInventory] = useState(null); // View Details
+  const [unitTarget, setUnitTarget] = useState(null); // Add IMEI modal
 
   const {
     data: inventoryResponse,
@@ -124,8 +126,10 @@ export default function ProductInventory() {
 
   // ---------- normalize data ----------
   const inventory = useMemo(() => {
-    if (Array.isArray(inventoryResponse?.inventory)) return inventoryResponse.inventory;
-    if (Array.isArray(inventoryResponse?.data?.inventory)) return inventoryResponse.data.inventory;
+    if (Array.isArray(inventoryResponse?.inventory))
+      return inventoryResponse.inventory;
+    if (Array.isArray(inventoryResponse?.data?.inventory))
+      return inventoryResponse.data.inventory;
     if (Array.isArray(inventoryResponse?.data)) return inventoryResponse.data;
     if (Array.isArray(inventoryResponse)) return inventoryResponse;
     return [];
@@ -142,7 +146,8 @@ export default function ProductInventory() {
 
   const products = useMemo(() => {
     if (Array.isArray(productResponse?.products)) return productResponse.products;
-    if (Array.isArray(productResponse?.data?.products)) return productResponse.data.products;
+    if (Array.isArray(productResponse?.data?.products))
+      return productResponse.data.products;
     if (Array.isArray(productResponse?.data)) return productResponse.data;
     if (Array.isArray(productResponse)) return productResponse;
     return [];
@@ -165,11 +170,13 @@ export default function ProductInventory() {
   const handleCreate = () => {
     setEditingInventory(null);
     setSelectedInventory(null);
+    setUnitTarget(null);
     setShowForm(true);
   };
 
   const handleEdit = (item) => {
     setSelectedInventory(null);
+    setUnitTarget(null);
     setEditingInventory(item);
     setShowForm(true);
   };
@@ -198,10 +205,12 @@ export default function ProductInventory() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this inventory?")) return;
+    if (!window.confirm("Are you sure you want to delete this inventory?"))
+      return;
     try {
       await deleteProductInventory(id).unwrap();
       if (selectedInventory?._id === id) setSelectedInventory(null);
+      if (unitTarget?._id === id) setUnitTarget(null);
       toast.success("Product inventory deleted successfully");
     } catch (err) {
       toast.error(err?.data?.message || "Failed to delete inventory");
@@ -233,17 +242,32 @@ export default function ProductInventory() {
 
       {/* SUMMARY */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard title="Total Inventory" value={pagination.total || inventory.length} icon={Boxes} />
+        <SummaryCard
+          title="Total Inventory"
+          value={pagination.total || inventory.length}
+          icon={Boxes}
+        />
         <SummaryCard title="In Stock" value={inStockCount} icon={CheckCircle} />
-        <SummaryCard title="Low Stock" value={lowStockCount} icon={AlertTriangle} />
-        <SummaryCard title="Out of Stock" value={outOfStockCount} icon={XCircle} />
+        <SummaryCard
+          title="Low Stock"
+          value={lowStockCount}
+          icon={AlertTriangle}
+        />
+        <SummaryCard
+          title="Out of Stock"
+          value={outOfStockCount}
+          icon={XCircle}
+        />
       </div>
 
       {/* FILTERS */}
       <div className="rounded-2xl border border-primary bg-card p-4 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-md">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary" />
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary"
+            />
             <input
               type="text"
               value={search}
@@ -251,7 +275,7 @@ export default function ProductInventory() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search product, SKU, color, size…"
+              placeholder="Search by product name, color or size..."
               className="h-11 w-full rounded-xl border border-primary bg-surface pl-10 pr-4 text-sm text-primary outline-none transition focus:border-brand"
             />
           </div>
@@ -265,7 +289,7 @@ export default function ProductInventory() {
               }}
               className="h-11 w-full rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none focus:border-brand sm:min-w-[150px]"
             >
-              <option value="">All Stock</option>
+              <option value="">All Stock Status</option>
               <option value="in-stock">In Stock</option>
               <option value="low-stock">Low Stock</option>
               <option value="out-of-stock">Out of Stock</option>
@@ -276,7 +300,10 @@ export default function ProductInventory() {
               onClick={() => refetch()}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary bg-surface px-4 text-sm font-medium text-primary transition hover:bg-muted-action lg:w-auto"
             >
-              <RefreshCw size={17} className={isFetching ? "animate-spin" : ""} />
+              <RefreshCw
+                size={17}
+                className={isFetching ? "animate-spin" : ""}
+              />
               Refresh
             </button>
           </div>
@@ -289,14 +316,27 @@ export default function ProductInventory() {
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="border-b border-secondary bg-surface">
               <tr>
-                <th className="px-5 py-4 text-left font-semibold text-primary">Product</th>
-                <th className="px-5 py-4 text-left font-semibold text-primary">SKU</th>
-                <th className="px-5 py-4 text-left font-semibold text-primary">Variant</th>
-                <th className="px-5 py-4 text-left font-semibold text-primary">Quantity</th>
-                <th className="px-5 py-4 text-left font-semibold text-primary">Purchase</th>
-                <th className="px-5 py-4 text-left font-semibold text-primary">Sale</th>
-                <th className="px-5 py-4 text-left font-semibold text-primary">Status</th>
-                <th className="px-5 py-4 text-right font-semibold text-primary">Actions</th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">
+                  Product
+                </th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">
+                  Variant
+                </th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">
+                  Quantity
+                </th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">
+                  Purchase Price
+                </th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">
+                  Sale Price
+                </th>
+                <th className="px-5 py-4 text-left font-semibold text-primary">
+                  Status
+                </th>
+                <th className="px-5 py-4 text-right font-semibold text-primary">
+                  Actions
+                </th>
               </tr>
             </thead>
 
@@ -305,13 +345,22 @@ export default function ProductInventory() {
                 <InventorySkeleton />
               ) : inventory.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-16 text-center">
-                    <Package size={42} className="mx-auto mb-3 text-secondary" />
-                    <h3 className="text-base font-semibold text-primary">No inventory found</h3>
+                  <td colSpan={7} className="px-5 py-16 text-center">
+                    <Package
+                      size={42}
+                      className="mx-auto mb-3 text-secondary"
+                    />
+                    <h3 className="text-base font-semibold text-primary">
+                      No inventory found
+                    </h3>
                     <p className="mt-1 text-sm text-secondary">
-                      Add inventory for one of your products to start managing stock.
+                      Add inventory for your products to start managing stock.
                     </p>
-                    <Button type="button" onClick={handleCreate} className="mt-5 inline-flex items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={handleCreate}
+                      className="mt-5 inline-flex items-center gap-2"
+                    >
                       <Plus size={17} />
                       Add Inventory
                     </Button>
@@ -327,21 +376,15 @@ export default function ProductInventory() {
                   return (
                     <tr key={item._id} className="transition hover:bg-surface">
                       <td className="px-5 py-4">
-                        <p className="max-w-[220px] truncate font-semibold text-primary">
+                        <p className="max-w-[240px] truncate font-semibold text-primary">
                           {getProductName(product)}
                         </p>
                         {isSerial && (
                           <span className="mt-1 inline-flex items-center gap-1 text-xs text-brand">
                             <Smartphone size={12} />
-                            Serial
+                            Serial Tracking
                           </span>
                         )}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <span className="font-mono text-xs text-primary">
-                          {getProductSku(product)}
-                        </span>
                       </td>
 
                       <td className="px-5 py-4">
@@ -364,8 +407,12 @@ export default function ProductInventory() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <span className="font-semibold text-primary">{item.quantity}</span>
-                        <span className="ml-2 text-xs text-secondary">/ min {item.minStock}</span>
+                        <span className="font-semibold text-primary">
+                          {item.quantity}
+                        </span>
+                        <span className="ml-2 text-xs text-secondary">
+                          / min {item.minStock}
+                        </span>
                       </td>
 
                       <td className="whitespace-nowrap px-5 py-4 font-medium text-primary">
@@ -386,15 +433,30 @@ export default function ProductInventory() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-1.5">
+                          {/* View Details */}
                           <button
                             type="button"
                             onClick={() => setSelectedInventory(item)}
                             className="rounded-lg border border-primary p-2 text-secondary transition hover:bg-muted-action hover:text-primary"
-                            title="View"
+                            title="View Details"
                           >
                             <Eye size={16} />
                           </button>
+
+                          {/* Add IMEI - Only for serial products */}
+                          {isSerial && (
+                            <button
+                              type="button"
+                              onClick={() => setUnitTarget(item)}
+                              className="rounded-lg border border-primary p-2 text-secondary transition hover:bg-muted-action hover:text-brand"
+                              title="Add IMEI / Serial"
+                            >
+                              <Smartphone size={16} />
+                            </button>
+                          )}
+
+                          {/* Edit */}
                           <button
                             type="button"
                             onClick={() => handleEdit(item)}
@@ -403,6 +465,8 @@ export default function ProductInventory() {
                           >
                             <Pencil size={16} />
                           </button>
+
+                          {/* Delete */}
                           <button
                             type="button"
                             onClick={() => handleDelete(item._id)}
@@ -461,12 +525,20 @@ export default function ProductInventory() {
         />
       )}
 
-      {/* DETAILS + UNITS */}
+      {/* VIEW DETAILS MODAL (Fully scrollable & responsive) */}
       {selectedInventory && (
         <InventoryDetails
           inventory={selectedInventory}
           onClose={() => setSelectedInventory(null)}
           onEdit={() => handleEdit(selectedInventory)}
+        />
+      )}
+
+      {/* ADD IMEI MODAL (Simple & Discoverable) */}
+      {unitTarget && (
+        <AddUnitModal
+          inventory={unitTarget}
+          onClose={() => setUnitTarget(null)}
         />
       )}
     </div>
@@ -494,23 +566,30 @@ function SummaryCard({ title, value, icon: Icon }) {
 }
 
 // ======================================================
-// INVENTORY FORM (ProductInventory only – NO IMEI)
+// INVENTORY FORM
 // ======================================================
 
-function InventoryForm({ products, productsLoading, inventory, loading, onClose, onSubmit }) {
+function InventoryForm({
+  products,
+  productsLoading,
+  inventory,
+  loading,
+  onClose,
+  onSubmit,
+}) {
   const isEdit = Boolean(inventory);
 
   const [form, setForm] = useState({
     product: inventory?.product?._id || inventory?.product || "",
     color: inventory?.color || "",
     size: inventory?.size || "",
-    quantity: inventory?.quantity ?? 0,
-    minStock: inventory?.minStock ?? 0,
+    quantity: inventory?.quantity ?? "",
+    minStock: inventory?.minStock ?? "",
     maxStock: inventory?.maxStock ?? "",
     purchasePrice: inventory?.purchasePrice ?? "",
     salePrice: inventory?.salePrice ?? "",
-    discount: inventory?.discount ?? 0,
-    tax: inventory?.tax ?? 0,
+    discount: inventory?.discount ?? "",
+    tax: inventory?.tax ?? "",
   });
 
   const selectedProduct = useMemo(() => {
@@ -534,25 +613,29 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
       product: e.target.value,
       color: "",
       size: "",
-      quantity: 0,
     }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // ---------- validation ----------
+  const validate = () => {
     if (!form.product) {
       toast.error("Product is required");
-      return;
+      return false;
     }
-    if (form.quantity === "" || Number(form.quantity) < 0) {
-      toast.error("Quantity is required and cannot be negative");
-      return;
+    if (form.quantity === "" || form.quantity === null) {
+      toast.error("Quantity is required");
+      return false;
     }
-    if (form.minStock === "" || Number(form.minStock) < 0) {
-      toast.error("Minimum stock is required and cannot be negative");
-      return;
+    if (Number(form.quantity) < 0) {
+      toast.error("Quantity cannot be negative");
+      return false;
+    }
+    if (form.minStock === "" || form.minStock === null) {
+      toast.error("Minimum stock is required");
+      return false;
+    }
+    if (Number(form.minStock) < 0) {
+      toast.error("Minimum stock cannot be negative");
+      return false;
     }
     if (
       form.maxStock !== "" &&
@@ -560,37 +643,49 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
       Number(form.maxStock) < Number(form.minStock)
     ) {
       toast.error("Maximum stock cannot be less than minimum stock");
-      return;
+      return false;
     }
     if (form.purchasePrice !== "" && Number(form.purchasePrice) < 0) {
       toast.error("Purchase price cannot be negative");
-      return;
+      return false;
     }
     if (form.salePrice !== "" && Number(form.salePrice) < 0) {
       toast.error("Sale price cannot be negative");
-      return;
+      return false;
     }
-    if (Number(form.discount || 0) < 0 || Number(form.discount || 0) > 100) {
+    if (
+      form.discount !== "" &&
+      (Number(form.discount) < 0 || Number(form.discount) > 100)
+    ) {
       toast.error("Discount must be between 0 and 100");
-      return;
+      return false;
     }
-    if (Number(form.tax || 0) < 0) {
+    if (form.tax !== "" && Number(form.tax) < 0) {
       toast.error("Tax cannot be negative");
-      return;
+      return false;
     }
+    return true;
+  };
 
-    // ---------- payload (exactly matches ProductInventory schema) ----------
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+
     const payload = {
       product: form.product,
       color: hasVariants ? toTitleCase(form.color) || null : null,
       size: hasVariants ? toTitleCase(form.size) || null : null,
       quantity: Number(form.quantity),
       minStock: Number(form.minStock),
-      maxStock: form.maxStock === "" ? null : Number(form.maxStock),
-      purchasePrice: form.purchasePrice === "" ? 0 : Number(form.purchasePrice),
+      maxStock:
+        form.maxStock === "" || form.maxStock === null
+          ? null
+          : Number(form.maxStock),
+      purchasePrice:
+        form.purchasePrice === "" ? 0 : Number(form.purchasePrice),
       salePrice: form.salePrice === "" ? 0 : Number(form.salePrice),
-      discount: Number(form.discount || 0),
-      tax: Number(form.tax || 0),
+      discount: form.discount === "" ? 0 : Number(form.discount),
+      tax: form.tax === "" ? 0 : Number(form.tax),
     };
 
     onSubmit(payload);
@@ -598,14 +693,15 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4">
-      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-3xl flex-col overflow-hidden rounded-2xl border border-primary bg-card shadow-2xl">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-3xl flex-col overflow-hidden rounded-2xl border border-primary bg-card shadow-2xl">
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-secondary px-4 py-4 sm:px-6">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-primary sm:text-xl">
               {isEdit ? "Update Product Inventory" : "Add Product Inventory"}
             </h2>
             <p className="mt-1 text-xs text-secondary sm:text-sm">
-              Stock levels and pricing. Serial units (IMEI) are managed separately.
+              Set stock levels and pricing. Serial numbers (IMEI) can be added
+              later.
             </p>
           </div>
           <button
@@ -632,12 +728,12 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
                 className="h-11 w-full rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none focus:border-brand disabled:opacity-60"
               >
                 <option value="">
-                  {productsLoading ? "Loading products…" : "Select Product"}
+                  {productsLoading ? "Loading products..." : "Select product"}
                 </option>
                 {products.map((p) => (
                   <option key={p._id} value={p._id}>
-                    {getProductName(p)} — {getProductSku(p)}
-                    {p.trackSerial ? " (Serial)" : ""}
+                    {getProductName(p)}
+                    {p.trackSerial ? "  (Serial Tracking)" : ""}
                   </option>
                 ))}
               </select>
@@ -645,21 +741,30 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
               {selectedProduct && (
                 <div className="mt-3 rounded-xl border border-primary bg-surface p-4">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <InfoItem label="Product" value={getProductName(selectedProduct)} />
-                    <InfoItem label="Brand" value={getProductBrand(selectedProduct)} />
-                    <InfoItem label="Model" value={getProductModel(selectedProduct)} />
+                    <InfoItem
+                      label="Product"
+                      value={getProductName(selectedProduct)}
+                    />
+                    <InfoItem
+                      label="Brand"
+                      value={getProductBrand(selectedProduct)}
+                    />
+                    <InfoItem
+                      label="Model"
+                      value={getProductModel(selectedProduct)}
+                    />
                   </div>
                   {trackSerial && (
                     <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand">
                       <Smartphone size={14} />
-                      This product uses serial / IMEI tracking. Add units after creating inventory.
+                      This product uses serial / IMEI tracking.
                     </p>
                   )}
                 </div>
               )}
             </div>
 
-            {/* VARIANTS (only if hasVariants) */}
+            {/* VARIANTS */}
             {hasVariants && (
               <div>
                 <h3 className="mb-3 font-semibold text-primary">Variant</h3>
@@ -669,14 +774,14 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
                     name="color"
                     value={form.color}
                     onChange={handleChange}
-                    placeholder="e.g. Black"
+                    placeholder="e.g. Black, Blue, Gold"
                   />
                   <FormField
-                    label="Size"
+                    label="Size / Storage"
                     name="size"
                     value={form.size}
                     onChange={handleChange}
-                    placeholder="e.g. Large / 42"
+                    placeholder="e.g. 128GB, 256GB, Large"
                   />
                 </div>
               </div>
@@ -694,6 +799,7 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
                   value={form.quantity}
                   onChange={handleChange}
                   required
+                  placeholder="Enter quantity"
                 />
                 <FormField
                   label="Minimum Stock"
@@ -703,6 +809,7 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
                   value={form.minStock}
                   onChange={handleChange}
                   required
+                  placeholder="Enter minimum stock"
                 />
                 <FormField
                   label="Maximum Stock"
@@ -728,6 +835,7 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
                   step="0.01"
                   value={form.purchasePrice}
                   onChange={handleChange}
+                  placeholder="0.00"
                 />
                 <FormField
                   label="Sale Price"
@@ -737,6 +845,7 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
                   step="0.01"
                   value={form.salePrice}
                   onChange={handleChange}
+                  placeholder="0.00"
                 />
                 <FormField
                   label="Discount (%)"
@@ -747,6 +856,7 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
                   step="0.01"
                   value={form.discount}
                   onChange={handleChange}
+                  placeholder="0"
                 />
                 <FormField
                   label="Tax"
@@ -756,20 +866,31 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
                   step="0.01"
                   value={form.tax}
                   onChange={handleChange}
+                  placeholder="0"
                 />
               </div>
             </div>
 
             {/* ACTIONS */}
             <div className="flex flex-col-reverse gap-3 border-t border-secondary pt-5 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="w-full sm:w-auto">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={loading}
+                className="w-full sm:w-auto"
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading} className="inline-flex w-full items-center justify-center gap-2 sm:w-auto">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="inline-flex w-full items-center justify-center gap-2 sm:w-auto"
+              >
                 {loading ? (
                   <>
                     <RefreshCw size={17} className="animate-spin" />
-                    Saving…
+                    Saving...
                   </>
                 ) : (
                   <>
@@ -787,20 +908,22 @@ function InventoryForm({ products, productsLoading, inventory, loading, onClose,
 }
 
 // ======================================================
-// DETAILS + INVENTORY UNITS (IMEI) for trackSerial products
+// ADD IMEI MODAL (Simple & Discoverable)
 // ======================================================
 
-function InventoryDetails({ inventory, onClose, onEdit }) {
+function AddUnitModal({ inventory, onClose }) {
   const product = inventory?.product;
-  const trackSerial = Boolean(product?.trackSerial);
 
-  const { data: unitsResponse, isLoading: unitsLoading, refetch: refetchUnits } =
-    useGetInventoryUnitsByProductInventoryQuery(inventory._id, {
-      skip: !trackSerial,
-    });
+  const {
+    data: unitsResponse,
+    isLoading: unitsLoading,
+    refetch: refetchUnits,
+  } = useGetInventoryUnitsByProductInventoryQuery(inventory._id);
 
-  const [createUnit, { isLoading: isCreatingUnit }] = useCreateInventoryUnitMutation();
-  const [deleteUnit, { isLoading: isDeletingUnit }] = useDeleteInventoryUnitMutation();
+  const [createUnit, { isLoading: isCreatingUnit }] =
+    useCreateInventoryUnitMutation();
+  const [deleteUnit, { isLoading: isDeletingUnit }] =
+    useDeleteInventoryUnitMutation();
 
   const units = useMemo(() => {
     if (Array.isArray(unitsResponse)) return unitsResponse;
@@ -820,41 +943,51 @@ function InventoryDetails({ inventory, onClose, onEdit }) {
       return;
     }
 
+    if (!/^\d{15}$/.test(imei.trim())) {
+      toast.error("IMEI must be exactly 15 digits");
+      return;
+    }
+
     try {
       await createUnit({
         product: product._id || product,
         productInventory: inventory._id,
-        imei: imei.trim().toUpperCase(),
+        imei: imei.trim(),
         serialNumber: serialNumber.trim() || null,
       }).unwrap();
 
-      toast.success("Inventory unit (IMEI) added successfully");
+      toast.success("IMEI added successfully");
       setImei("");
       setSerialNumber("");
       refetchUnits();
     } catch (err) {
-      toast.error(err?.data?.message || "Failed to add inventory unit");
+      toast.error(err?.data?.message || "Failed to add IMEI");
     }
   };
 
   const handleDeleteUnit = async (id) => {
-    if (!window.confirm("Delete this IMEI unit?")) return;
+    if (!window.confirm("Are you sure you want to delete this IMEI?")) return;
     try {
       await deleteUnit(id).unwrap();
-      toast.success("Inventory unit deleted");
+      toast.success("IMEI deleted successfully");
       refetchUnits();
     } catch (err) {
-      toast.error(err?.data?.message || "Failed to delete unit");
+      toast.error(err?.data?.message || "Failed to delete IMEI");
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4">
-      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-2xl border border-primary bg-card shadow-2xl">
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-secondary px-4 py-4 sm:px-6">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-lg flex-col overflow-hidden rounded-2xl border border-primary bg-card shadow-2xl">
+        {/* Header */}
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-secondary px-4 py-4 sm:px-5">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-primary sm:text-xl">Inventory Details</h2>
-            <p className="mt-1 truncate text-sm text-secondary">{getProductName(product)}</p>
+            <h2 className="text-lg font-bold text-primary">
+              Add IMEI / Serial
+            </h2>
+            <p className="mt-1 truncate text-sm text-secondary">
+              {getProductName(product)}
+            </p>
           </div>
           <button
             type="button"
@@ -865,36 +998,247 @@ function InventoryDetails({ inventory, onClose, onEdit }) {
           </button>
         </div>
 
+        {/* Body - Scrollable */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+          {/* Add Form */}
+          <form onSubmit={handleAddUnit} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-primary">
+                IMEI <span className="text-[var(--color-danger)]">*</span>
+              </label>
+              <input
+                type="text"
+                value={imei}
+                onChange={(e) => setImei(e.target.value)}
+                placeholder="Enter 15-digit IMEI"
+                maxLength={15}
+                className="h-11 w-full rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none focus:border-brand"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-primary">
+                Serial Number
+              </label>
+              <input
+                type="text"
+                value={serialNumber}
+                onChange={(e) => setSerialNumber(e.target.value)}
+                placeholder="Optional"
+                className="h-11 w-full rounded-xl border border-primary bg-surface px-4 text-sm text-primary outline-none focus:border-brand"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isCreatingUnit}
+              className="inline-flex w-full items-center justify-center gap-2"
+            >
+              {isCreatingUnit ? (
+                <RefreshCw size={17} className="animate-spin" />
+              ) : (
+                <Plus size={17} />
+              )}
+              Add IMEI
+            </Button>
+          </form>
+
+          {/* Existing Units */}
+          <div className="mt-6">
+            <h3 className="mb-3 text-sm font-semibold text-primary">
+              Existing IMEIs ({units.length})
+            </h3>
+
+            {unitsLoading ? (
+              <p className="text-sm text-secondary">Loading...</p>
+            ) : units.length === 0 ? (
+              <p className="text-sm text-secondary">No IMEIs added yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {units.map((unit) => (
+                  <div
+                    key={unit._id}
+                    className="flex items-center justify-between rounded-xl border border-primary bg-surface px-4 py-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Hash size={14} className="text-secondary" />
+                      <span className="font-mono text-sm font-medium text-primary">
+                        {unit.imei}
+                      </span>
+                      {unit.serialNumber && (
+                        <span className="text-xs text-secondary">
+                          · {unit.serialNumber}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteUnit(unit._id)}
+                      disabled={isDeletingUnit}
+                      className="rounded-lg border border-[var(--color-danger)]/20 p-1.5 text-[var(--color-danger)] transition hover:bg-[var(--color-danger)]/10"
+                      title="Delete IMEI"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex shrink-0 justify-end border-t border-secondary p-4">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ======================================================
+// VIEW DETAILS MODAL (Fully scrollable & responsive)
+// ======================================================
+
+function InventoryDetails({ inventory, onClose, onEdit }) {
+  const product = inventory?.product;
+  const trackSerial = Boolean(product?.trackSerial);
+
+  const {
+    data: unitsResponse,
+    isLoading: unitsLoading,
+    refetch: refetchUnits,
+  } = useGetInventoryUnitsByProductInventoryQuery(inventory._id, {
+    skip: !trackSerial,
+  });
+
+  const [createUnit, { isLoading: isCreatingUnit }] =
+    useCreateInventoryUnitMutation();
+  const [deleteUnit, { isLoading: isDeletingUnit }] =
+    useDeleteInventoryUnitMutation();
+
+  const units = useMemo(() => {
+    if (Array.isArray(unitsResponse)) return unitsResponse;
+    if (Array.isArray(unitsResponse?.data)) return unitsResponse.data;
+    if (Array.isArray(unitsResponse?.units)) return unitsResponse.units;
+    return [];
+  }, [unitsResponse]);
+
+  const [imei, setImei] = useState("");
+  const [serialNumber, setSerialNumber] = useState("");
+
+  const handleAddUnit = async (e) => {
+    e.preventDefault();
+
+    if (!imei.trim()) {
+      toast.error("IMEI is required");
+      return;
+    }
+    if (!/^\d{15}$/.test(imei.trim())) {
+      toast.error("IMEI must be exactly 15 digits");
+      return;
+    }
+
+    try {
+      await createUnit({
+        product: product._id || product,
+        productInventory: inventory._id,
+        imei: imei.trim(),
+        serialNumber: serialNumber.trim() || null,
+      }).unwrap();
+
+      toast.success("IMEI added successfully");
+      setImei("");
+      setSerialNumber("");
+      refetchUnits();
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to add IMEI");
+    }
+  };
+
+  const handleDeleteUnit = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this IMEI?")) return;
+    try {
+      await deleteUnit(id).unwrap();
+      toast.success("IMEI deleted successfully");
+      refetchUnits();
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to delete IMEI");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-2xl border border-primary bg-card shadow-2xl">
+        {/* Header */}
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-secondary px-4 py-4 sm:px-6">
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-primary sm:text-xl">
+              Inventory Details
+            </h2>
+            <p className="mt-1 truncate text-sm text-secondary">
+              {getProductName(product)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-secondary transition hover:bg-muted-action hover:text-primary"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body - Fully Scrollable */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* Basic info */}
           <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:p-6">
             <DetailItem label="Product" value={getProductName(product)} />
-            <DetailItem label="SKU" value={getProductSku(product)} />
             <DetailItem label="Brand" value={getProductBrand(product)} />
             <DetailItem label="Model" value={getProductModel(product)} />
             <DetailItem label="Color" value={inventory.color || "—"} />
             <DetailItem label="Size" value={inventory.size || "—"} />
             <DetailItem label="Quantity" value={inventory.quantity} />
             <DetailItem label="Min Stock" value={inventory.minStock} />
-            <DetailItem label="Max Stock" value={inventory.maxStock ?? "No limit"} />
-            <DetailItem label="Purchase Price" value={formatMoney(inventory.purchasePrice)} />
-            <DetailItem label="Sale Price" value={formatMoney(inventory.salePrice)} />
-            <DetailItem label="Discount" value={`${inventory.discount || 0}%`} />
+            <DetailItem
+              label="Max Stock"
+              value={inventory.maxStock ?? "No limit"}
+            />
+            <DetailItem
+              label="Purchase Price"
+              value={formatMoney(inventory.purchasePrice)}
+            />
+            <DetailItem
+              label="Sale Price"
+              value={formatMoney(inventory.salePrice)}
+            />
+            <DetailItem
+              label="Discount"
+              value={`${inventory.discount || 0}%`}
+            />
             <DetailItem label="Tax" value={inventory.tax || 0} />
-            <DetailItem label="Stock Status" value={getStockStatus(inventory).label} />
+            <DetailItem
+              label="Stock Status"
+              value={getStockStatus(inventory).label}
+            />
           </div>
 
-          {/* SERIAL UNITS – only for trackSerial products (mobiles) */}
+          {/* IMEI Section */}
           {trackSerial && (
             <div className="border-t border-secondary p-4 sm:p-6">
               <div className="mb-4 flex items-center gap-2">
                 <Smartphone size={18} className="text-brand" />
-                <h3 className="font-semibold text-primary">Serial / IMEI Units</h3>
+                <h3 className="font-semibold text-primary">
+                  Serial / IMEI Units
+                </h3>
               </div>
 
-              {/* Add unit form */}
-              <form onSubmit={handleAddUnit} className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="sm:col-span-1">
+              <form
+                onSubmit={handleAddUnit}
+                className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3"
+              >
+                <div>
                   <label className="mb-1.5 block text-xs font-medium text-primary">
                     IMEI <span className="text-[var(--color-danger)]">*</span>
                   </label>
@@ -902,13 +1246,14 @@ function InventoryDetails({ inventory, onClose, onEdit }) {
                     type="text"
                     value={imei}
                     onChange={(e) => setImei(e.target.value)}
-                    placeholder="e.g. 356938035643809"
+                    placeholder="15-digit IMEI"
+                    maxLength={15}
                     className="h-10 w-full rounded-xl border border-primary bg-surface px-3 text-sm text-primary outline-none focus:border-brand"
                   />
                 </div>
-                <div className="sm:col-span-1">
+                <div>
                   <label className="mb-1.5 block text-xs font-medium text-primary">
-                    Serial Number (optional)
+                    Serial Number
                   </label>
                   <input
                     type="text"
@@ -929,16 +1274,15 @@ function InventoryDetails({ inventory, onClose, onEdit }) {
                     ) : (
                       <Plus size={16} />
                     )}
-                    Add Unit
+                    Add IMEI
                   </Button>
                 </div>
               </form>
 
-              {/* Units list */}
               {unitsLoading ? (
-                <p className="text-sm text-secondary">Loading units…</p>
+                <p className="text-sm text-secondary">Loading IMEIs...</p>
               ) : units.length === 0 ? (
-                <p className="text-sm text-secondary">No serial units added yet.</p>
+                <p className="text-sm text-secondary">No IMEIs added yet.</p>
               ) : (
                 <div className="space-y-2">
                   {units.map((unit) => (
@@ -962,7 +1306,7 @@ function InventoryDetails({ inventory, onClose, onEdit }) {
                         onClick={() => handleDeleteUnit(unit._id)}
                         disabled={isDeletingUnit}
                         className="rounded-lg border border-[var(--color-danger)]/20 p-1.5 text-[var(--color-danger)] transition hover:bg-[var(--color-danger)]/10"
-                        title="Delete unit"
+                        title="Delete IMEI"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -974,8 +1318,14 @@ function InventoryDetails({ inventory, onClose, onEdit }) {
           )}
         </div>
 
+        {/* Footer */}
         <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-secondary p-4 sm:flex-row sm:justify-end sm:p-5">
-          <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="w-full sm:w-auto"
+          >
             Close
           </Button>
           <Button
@@ -1013,7 +1363,9 @@ function FormField({
     <div className="min-w-0">
       <label className="mb-2 block text-sm font-medium text-primary">
         {label}
-        {required && <span className="ml-1 text-[var(--color-danger)]">*</span>}
+        {required && (
+          <span className="ml-1 text-[var(--color-danger)]">*</span>
+        )}
       </label>
       <input
         type={type}
@@ -1036,7 +1388,10 @@ function InfoItem({ label, value }) {
   return (
     <div className="min-w-0">
       <p className="text-xs text-secondary">{label}</p>
-      <p className="mt-1 truncate text-sm font-medium text-primary" title={String(value ?? "")}>
+      <p
+        className="mt-1 truncate text-sm font-medium text-primary"
+        title={String(value ?? "")}
+      >
         {value}
       </p>
     </div>
@@ -1047,7 +1402,10 @@ function DetailItem({ label, value }) {
   return (
     <div className="min-w-0 rounded-xl border border-primary bg-surface p-3 sm:p-4">
       <p className="text-xs text-secondary">{label}</p>
-      <p className="mt-1 break-words text-sm font-semibold text-primary" title={String(value ?? "")}>
+      <p
+        className="mt-1 break-words text-sm font-semibold text-primary"
+        title={String(value ?? "")}
+      >
         {value}
       </p>
     </div>
@@ -1059,7 +1417,7 @@ function InventorySkeleton() {
     <>
       {Array.from({ length: 6 }).map((_, i) => (
         <tr key={i}>
-          {Array.from({ length: 8 }).map((_, j) => (
+          {Array.from({ length: 7 }).map((_, j) => (
             <td key={j} className="px-5 py-5">
               <div className="h-4 animate-pulse rounded bg-muted-action" />
             </td>

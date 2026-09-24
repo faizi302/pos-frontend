@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "@/components/layout/Sidebar";
 import Header from "@/components/layout/Header";
+import WhatsAppFloat from "@/components/common/WhatsAppFloat";
 
 export default function MainLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -22,6 +23,9 @@ export default function MainLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Always visible for Admin & Manager on every page */}
+      <WhatsAppFloat />
     </div>
   );
 }

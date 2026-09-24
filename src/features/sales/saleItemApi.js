@@ -3,15 +3,32 @@ import { API_ROUTES } from "@/config/api";
 
 export const saleItemApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
+    // ====================== CREATE ======================
     createSaleItem: builder.mutation({
       query: (data) => ({
         url: API_ROUTES.saleItems,
         method: "POST",
         body: data,
       }),
-      invalidatesTags: ["SaleItem", "Sale", "ProductInventory"],
+      invalidatesTags: (result, error, arg) => [
+        "SaleItem",
+        "Sale",
+        "ProductInventory",
+        "InventoryUnit", // ← important
+        { type: "InventoryUnit", id: "LIST" },
+        // More precise invalidation (recommended)
+        ...(arg?.productInventory
+          ? [
+              {
+                type: "InventoryUnit",
+                id: `PRODUCT-INVENTORY-${arg.productInventory}`,
+              },
+            ]
+          : []),
+      ],
     }),
 
+    // ====================== GET ALL ======================
     getAllSaleItems: builder.query({
       query: (params = {}) => ({
         url: API_ROUTES.saleItems,
@@ -21,6 +38,7 @@ export const saleItemApi = baseApi.injectEndpoints({
       providesTags: ["SaleItem"],
     }),
 
+    // ====================== GET BY SALE ======================
     getSaleItemsBySale: builder.query({
       query: (saleId) => ({
         url: `${API_ROUTES.saleItems}/sale/${saleId}`,
@@ -32,6 +50,7 @@ export const saleItemApi = baseApi.injectEndpoints({
       ],
     }),
 
+    // ====================== GET BY ID ======================
     getSaleItemById: builder.query({
       query: (id) => ({
         url: `${API_ROUTES.saleItems}/${id}`,
@@ -40,21 +59,43 @@ export const saleItemApi = baseApi.injectEndpoints({
       providesTags: (result, error, id) => [{ type: "SaleItem", id }],
     }),
 
+    // ====================== UPDATE ======================
     updateSaleItem: builder.mutation({
       query: ({ id, ...data }) => ({
         url: `${API_ROUTES.saleItems}/${id}`,
         method: "PATCH",
         body: data,
       }),
-      invalidatesTags: ["SaleItem", "Sale", "ProductInventory"],
+      invalidatesTags: (result, error, arg) => [
+        "SaleItem",
+        "Sale",
+        "ProductInventory",
+        "InventoryUnit",
+        { type: "InventoryUnit", id: "LIST" },
+        ...(arg?.productInventory
+          ? [
+              {
+                type: "InventoryUnit",
+                id: `PRODUCT-INVENTORY-${arg.productInventory}`,
+              },
+            ]
+          : []),
+      ],
     }),
 
+    // ====================== DELETE ======================
     deleteSaleItem: builder.mutation({
       query: (id) => ({
         url: `${API_ROUTES.saleItems}/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["SaleItem", "Sale", "ProductInventory"],
+      invalidatesTags: [
+        "SaleItem",
+        "Sale",
+        "ProductInventory",
+        "InventoryUnit",
+        { type: "InventoryUnit", id: "LIST" },
+      ],
     }),
   }),
 });

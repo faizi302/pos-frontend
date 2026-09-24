@@ -56,6 +56,34 @@ function getFallbackLogoText(user) {
 }
 
 // =====================================================
+// LOGO IMAGE – always constrained (any upload size/aspect)
+// Fits inside the h-16 header without covering nav items.
+// =====================================================
+
+function ConstrainedLogo({ src, alt, collapsed }) {
+  if (collapsed) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className="mx-auto h-9 w-9 shrink-0 rounded-lg object-contain"
+      />
+    );
+  }
+
+  // Expanded: max height ~40px, max width ~180px, contain aspect ratio
+  return (
+    <div className="flex max-h-20   w-[200px] items-center justify-start overflow-hidden">
+      <img
+        src={src}
+        alt={alt}
+        className="max-h-15 w-full   object-cover "
+      />
+    </div>
+  );
+}
+
+// =====================================================
 // SIDEBAR LOGO (role-aware)
 // =====================================================
 
@@ -71,11 +99,13 @@ function SidebarLogo({ collapsed }) {
         className="mx-auto h-9 w-9 shrink-0 object-contain"
       />
     ) : (
-      <img
-        src="/images/mylogo2.png"
-        alt="Nexora"
-        className="h-full w-full object-cover"
-      />
+      <div className="flex h-10 max-h-10 w-full max-w-[180px] items-center overflow-hidden">
+        <img
+          src="/images/mylogo2.png"
+          alt="Nexora"
+          className="h-full w-auto max-h-10 max-w-full object-contain object-left"
+        />
+      </div>
     );
   }
 
@@ -85,14 +115,10 @@ function SidebarLogo({ collapsed }) {
 
     if (logoUrl) {
       return (
-        <img
+        <ConstrainedLogo
           src={logoUrl}
           alt={user?.name || "Logo"}
-          className={
-            collapsed
-              ? "mx-auto h-9 w-9 shrink-0 rounded-lg object-contain"
-              : "h-full w-auto w-full object-contain"
-          }
+          collapsed={collapsed}
         />
       );
     }
@@ -101,7 +127,7 @@ function SidebarLogo({ collapsed }) {
     const text = getFallbackLogoText(user);
 
     return collapsed ? (
-      <div className="mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-sm font-bold text-[var(--action-primary)]">
+      <div className="mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--action-primary)]/15 text-sm font-bold text-[var(--action-primary)]">
         {text.charAt(0).toUpperCase()}
       </div>
     ) : (
@@ -118,14 +144,10 @@ function SidebarLogo({ collapsed }) {
 
     if (logoUrl) {
       return (
-        <img
+        <ConstrainedLogo
           src={logoUrl}
           alt={admin?.name || "Logo"}
-          className={
-            collapsed
-              ? "mx-auto h-9 w-9 shrink-0 rounded-lg object-contain"
-              : "h-10 w-auto max-w-full object-contain"
-          }
+          collapsed={collapsed}
         />
       );
     }
@@ -134,7 +156,7 @@ function SidebarLogo({ collapsed }) {
     const text = getFallbackLogoText(admin || user);
 
     return collapsed ? (
-      <div className="mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-sm font-bold text-[var(--action-primary)]">
+      <div className="mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--action-primary)]/15 text-sm font-bold text-[var(--action-primary)]">
         {text.charAt(0).toUpperCase()}
       </div>
     ) : (
@@ -152,11 +174,13 @@ function SidebarLogo({ collapsed }) {
       className="mx-auto h-9 w-9 shrink-0 object-contain"
     />
   ) : (
-    <img
-      src="/images/nexora3.png"
-      alt="Nexora"
-      className="h-full w-full object-cover"
-    />
+    <div className="flex h-10 max-h-10 w-full max-w-[180px] items-center overflow-hidden">
+      <img
+        src="/images/nexora3.png"
+        alt="Nexora"
+        className="h-full w-auto max-h-10 max-w-full object-contain object-left"
+      />
+    </div>
   );
 }
 
@@ -177,8 +201,10 @@ function NavItem({ item, collapsed, onCloseMobile }) {
       className={({ isActive }) =>
         `group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
           isActive
-            ? "bg-brand/15 text-[var(--action-primary)]"
-            : "text-primary hover:bg-muted-action"
+            ? // Active = app surface color (contrast against sidebar) + brand text
+              "bg-[var(--ui-primary)] text-[var(--action-primary)] shadow-sm"
+            : // Inactive = primary text, soft hover
+              "text-primary hover:bg-[var(--action-secondary)]"
         }`
       }
     >
@@ -189,7 +215,7 @@ function NavItem({ item, collapsed, onCloseMobile }) {
           <span className="truncate">{item.title}</span>
 
           {item.comingSoon && (
-            <span className="shrink-0 rounded-md bg-muted-action px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-secondary">
+            <span className="shrink-0 rounded-md bg-[var(--action-secondary)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-secondary">
               Soon
             </span>
           )}
@@ -248,7 +274,7 @@ function SidebarSection({
       <button
         type="button"
         onClick={onToggle}
-        className="group flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left transition-colors hover:bg-muted-action"
+        className="group flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left transition-colors hover:bg-[var(--action-secondary)]"
         aria-expanded={open}
       >
         <span className="text-[10px] font-semibold uppercase tracking-wider text-secondary">
@@ -323,13 +349,11 @@ export default function Sidebar({
 
   const content = (
     <div className="flex h-full flex-col">
-
       {/* =================================================
-          HEADER – Dynamic Logo
+          HEADER – Dynamic Logo (constrained)
       ================================================= */}
 
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-secondary px-3">
-
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border-secondary-color)] px-3">
         <div className="flex min-w-0 flex-1 items-center overflow-hidden">
           <SidebarLogo collapsed={collapsed} />
         </div>
@@ -338,7 +362,7 @@ export default function Sidebar({
         <button
           type="button"
           onClick={onCloseMobile}
-          className="ml-2 shrink-0 rounded-lg p-1.5 text-secondary hover:bg-muted-action md:hidden"
+          className="ml-2 shrink-0 rounded-lg p-1.5 text-secondary transition-colors hover:bg-[var(--action-secondary)] md:hidden"
           aria-label="Close menu"
         >
           <X className="h-5 w-5" />
@@ -369,12 +393,12 @@ export default function Sidebar({
           DESKTOP COLLAPSE BUTTON
       ================================================= */}
 
-      <div className="hidden shrink-0 border-t border-secondary p-2 md:block">
+      <div className="hidden shrink-0 border-t border-[var(--border-secondary-color)] p-2 md:block">
         <button
           type="button"
           onClick={onToggleCollapse}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-secondary transition-colors hover:bg-muted-action"
+          className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-secondary transition-colors hover:bg-[var(--action-secondary)]"
         >
           {collapsed ? (
             <ChevronsRight className="h-4.5 w-4.5" />
@@ -389,12 +413,22 @@ export default function Sidebar({
   // =====================================================
   // RETURN
   // =====================================================
+  //
+  // Contrast panel:
+  // - Sidebar background = brand-tinted mix of --ui-secondary
+  //   so it always differs from the main app surface (--ui-primary)
+  // - Works with every business theme + light/dark
+  // - Active nav uses --ui-primary (app bg) for clear contrast
+  // =====================================================
+
+  const sidebarSurfaceClass =
+    "bg-[color-mix(in_srgb,var(--action-primary)_9%,var(--ui-secondary))]";
 
   return (
     <>
       {/* Desktop Sidebar */}
       <aside
-        className={`sticky top-0 hidden h-screen shrink-0 border-r border-secondary bg-card transition-all duration-200 md:block ${
+        className={`sticky top-0 hidden h-screen shrink-0 border-r border-[var(--border-primary-color)] transition-all duration-200 md:block ${sidebarSurfaceClass} ${
           collapsed ? "w-[72px]" : "w-64"
         }`}
       >
@@ -408,7 +442,9 @@ export default function Sidebar({
             className="absolute inset-0 bg-black/50"
             onClick={onCloseMobile}
           />
-          <aside className="relative h-full w-72 bg-card shadow-xl animate-fade-up">
+          <aside
+            className={`relative h-full w-72 shadow-xl animate-fade-up ${sidebarSurfaceClass}`}
+          >
             {content}
           </aside>
         </div>

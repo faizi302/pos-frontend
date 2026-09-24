@@ -14,6 +14,8 @@ import {
   Building2,
   Users as UsersIcon,
   Eye,
+  MapPin,
+  Home,
 } from "lucide-react";
 
 import Avatar from "@/components/ui/Avatar";
@@ -57,18 +59,8 @@ function Row({ label, value }) {
 // USER DETAILS PAGE
 // =====================================================
 //
-// Dedicated page (NOT a modal) for two contexts:
-//
-// 1. Super Admin viewing an Admin
-//    Route: /users/:id
-//
-// 2. Admin (or Super Admin) viewing a Manager
-//    Route: /users/managers/:id
-//
-// The context is read from the URL rather than the
-// viewer's role, since Super Admin can view BOTH an
-// Admin (via /users/:id) and a Manager (via
-// /users/managers/:id).
+// 1. Super Admin viewing an Admin  →  /users/:id
+// 2. Admin (or Super Admin) viewing a Manager → /users/managers/:id
 // =====================================================
 
 export default function UserDetails() {
@@ -81,9 +73,7 @@ export default function UserDetails() {
   const isSuperAdmin = role === "super-admin";
   const isAdmin = role === "admin";
 
-  const isManagerContext = location.pathname.includes(
-    "/users/managers/"
-  );
+  const isManagerContext = location.pathname.includes("/users/managers/");
 
   // ===================================================
   // DELETE CONFIRMATION
@@ -92,19 +82,13 @@ export default function UserDetails() {
   const [deleting, setDeleting] = useState(false);
 
   // ===================================================
-  // STATUS UPDATE (SUPER ADMIN / ADMIN CONTEXT ONLY)
+  // STATUS UPDATE
   // ===================================================
 
   const [statusUpdating, setStatusUpdating] = useState(null);
 
   // =====================================================
   // ADMIN DETAILS
-  //
-  // GET /api/users/:id
-  //
-  // Response also contains:
-  // - managers
-  // - managerCount
   // =====================================================
 
   const {
@@ -118,8 +102,6 @@ export default function UserDetails() {
 
   // =====================================================
   // MANAGER DETAILS
-  //
-  // GET /api/users/managers/:id
   // =====================================================
 
   const {
@@ -132,45 +114,26 @@ export default function UserDetails() {
   });
 
   const data = isManagerContext ? managerData : adminData;
-  const isLoading = isManagerContext
-    ? managerLoading
-    : adminLoading;
-  const isError = isManagerContext
-    ? managerError
-    : adminError;
-  const refetch = isManagerContext
-    ? refetchManager
-    : refetchAdmin;
+  const isLoading = isManagerContext ? managerLoading : adminLoading;
+  const isError = isManagerContext ? managerError : adminError;
+  const refetch = isManagerContext ? refetchManager : refetchAdmin;
 
-  // Managers created by this Admin — only present in the
-  // Admin-details response.
-  const managers = !isManagerContext
-    ? data?.managers || []
-    : [];
+  const managers = !isManagerContext ? data?.managers || [] : [];
 
   // =====================================================
   // MUTATIONS
   // =====================================================
 
   const [updateUser] = useUpdateUserMutation();
-  const [deleteUser, { isLoading: deletingUser }] =
-    useDeleteUserMutation();
+  const [deleteUser, { isLoading: deletingUser }] = useDeleteUserMutation();
   const [deleteManager, { isLoading: deletingManager }] =
     useDeleteManagerMutation();
 
   // =====================================================
-  // PERMISSIONS FOR THIS CONTEXT
-  //
-  // Manager context: only the owning Admin edits/deletes.
-  // Super Admin can view a Manager but not edit/delete it.
-  //
-  // Admin context (Admin details): only Super Admin
-  // edits/deletes/changes status.
+  // PERMISSIONS
   // =====================================================
 
-  const canManageThisRecord = isManagerContext
-    ? isAdmin
-    : isSuperAdmin;
+  const canManageThisRecord = isManagerContext ? isAdmin : isSuperAdmin;
 
   // ===================================================
   // BACK
@@ -222,17 +185,13 @@ export default function UserDetails() {
 
   // ===================================================
   // UPDATE ADMIN STATUS
-  //
-  // Only meaningful in the Admin-details context.
   // ===================================================
 
   const updateAdminStatus = async (status) => {
     if (isManagerContext || !id) return;
 
     if (!can("users.update")) {
-      toast.error(
-        "You do not have permission to update this admin."
-      );
+      toast.error("You do not have permission to update this admin.");
       return;
     }
 
@@ -264,7 +223,7 @@ export default function UserDetails() {
   };
 
   // ===================================================
-  // MANAGERS TABLE COLUMNS (ADMIN DETAILS ONLY)
+  // MANAGERS TABLE COLUMNS
   // ===================================================
 
   const managerColumns = [
@@ -316,9 +275,7 @@ export default function UserDetails() {
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="flex items-center gap-3 text-secondary">
           <Loader2 className="h-5 w-5 animate-spin" />
-          {isManagerContext
-            ? "Loading manager..."
-            : "Loading admin..."}
+          {isManagerContext ? "Loading manager..." : "Loading admin..."}
         </div>
       </div>
     );
@@ -358,10 +315,7 @@ export default function UserDetails() {
 
   return (
     <div className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:p-8">
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
+      {/* HEADER */}
       <div className="mb-8">
         <button
           type="button"
@@ -374,19 +328,13 @@ export default function UserDetails() {
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <Avatar
-              src={data.avatar?.url}
-              name={data.name}
-              size="lg"
-            />
+            <Avatar src={data.avatar?.url} name={data.name} size="lg" />
 
             <div>
               <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
                 {data.name}
               </h1>
-              <p className="mt-0.5 text-sm text-secondary">
-                {data.email}
-              </p>
+              <p className="mt-0.5 text-sm text-secondary">{data.email}</p>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge tone="brand">
@@ -425,10 +373,7 @@ export default function UserDetails() {
             </div>
           </div>
 
-          {/* =================================================
-              ACTIONS
-          ================================================= */}
-
+          {/* ACTIONS */}
           {canManageThisRecord && (
             <div className="flex shrink-0 gap-2">
               {can("users.update") && (
@@ -451,64 +396,56 @@ export default function UserDetails() {
         </div>
       </div>
 
-      {/* =================================================
-          SUPER ADMIN STATUS ACTIONS (ADMIN CONTEXT ONLY)
-      ================================================= */}
+      {/* SUPER ADMIN STATUS ACTIONS (ADMIN CONTEXT ONLY) */}
+      {!isManagerContext && isSuperAdmin && can("users.update") && (
+        <div className="mb-6 flex flex-wrap gap-2 rounded-xl border border-primary bg-card p-4">
+          {data.status !== "active" && (
+            <Button
+              variant="outline"
+              icon={CheckCircle}
+              loading={statusUpdating === "active"}
+              onClick={() => updateAdminStatus("active")}
+            >
+              Approve
+            </Button>
+          )}
 
-      {!isManagerContext &&
-        isSuperAdmin &&
-        can("users.update") && (
-          <div className="mb-6 flex flex-wrap gap-2 rounded-xl border border-primary bg-card p-4">
-            {data.status !== "active" && (
-              <Button
-                variant="outline"
-                icon={CheckCircle}
-                loading={statusUpdating === "active"}
-                onClick={() => updateAdminStatus("active")}
-              >
-                Approve
-              </Button>
-            )}
+          {data.status !== "pending" && (
+            <Button
+              variant="outline"
+              icon={Clock3}
+              loading={statusUpdating === "pending"}
+              onClick={() => updateAdminStatus("pending")}
+            >
+              Set Pending
+            </Button>
+          )}
 
-            {data.status !== "pending" && (
-              <Button
-                variant="outline"
-                icon={Clock3}
-                loading={statusUpdating === "pending"}
-                onClick={() => updateAdminStatus("pending")}
-              >
-                Set Pending
-              </Button>
-            )}
+          {data.status !== "rejected" && (
+            <Button
+              variant="outline"
+              icon={XCircle}
+              loading={statusUpdating === "rejected"}
+              onClick={() => updateAdminStatus("rejected")}
+            >
+              Reject
+            </Button>
+          )}
 
-            {data.status !== "rejected" && (
-              <Button
-                variant="outline"
-                icon={XCircle}
-                loading={statusUpdating === "rejected"}
-                onClick={() => updateAdminStatus("rejected")}
-              >
-                Reject
-              </Button>
-            )}
+          {data.status !== "suspended" && (
+            <Button
+              variant="outline"
+              icon={Ban}
+              loading={statusUpdating === "suspended"}
+              onClick={() => updateAdminStatus("suspended")}
+            >
+              Block
+            </Button>
+          )}
+        </div>
+      )}
 
-            {data.status !== "suspended" && (
-              <Button
-                variant="outline"
-                icon={Ban}
-                loading={statusUpdating === "suspended"}
-                onClick={() => updateAdminStatus("suspended")}
-              >
-                Block
-              </Button>
-            )}
-          </div>
-        )}
-
-      {/* =================================================
-          DETAILS CARD
-      ================================================= */}
-
+      {/* DETAILS CARD */}
       <div className="rounded-2xl border border-primary bg-card p-5 sm:p-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-secondary">
           {isManagerContext ? "Manager Information" : "Admin Information"}
@@ -516,14 +453,14 @@ export default function UserDetails() {
 
         <div className="flex flex-col">
           <Row label="Phone" value={data.phone} />
-          <Row label="Role" value={data.role?.name || (isManagerContext ? "Manager" : "Admin")} />
+          <Row
+            label="Role"
+            value={
+              data.role?.name || (isManagerContext ? "Manager" : "Admin")
+            }
+          />
 
-          {/* ===============================================
-              BUSINESS CONTEXT
-              - Admin: owns Business / Business Type directly
-              - Manager: inherits it from the owning Admin
-          =============================================== */}
-
+          {/* BUSINESS CONTEXT */}
           {isManagerContext ? (
             <>
               <Row
@@ -538,23 +475,19 @@ export default function UserDetails() {
           ) : (
             <>
               <Row label="Business" value={data.business?.name} />
-              <Row
-                label="Business Type"
-                value={data.businessType?.name}
-              />
+              <Row label="Business Type" value={data.businessType?.name} />
             </>
           )}
 
-          {/* ===============================================
-              OWNER CONTEXT (MANAGER ONLY)
-          =============================================== */}
-
+          {/* OWNER (MANAGER ONLY) */}
           {isManagerContext && (
-            <Row
-              label="Created By (Admin)"
-              value={data.createdBy?.name}
-            />
+            <Row label="Created By (Admin)" value={data.createdBy?.name} />
           )}
+
+          {/* ADDRESS */}
+          <Row label="Country" value={data.country} />
+          <Row label="City" value={data.city} />
+          <Row label="Address" value={data.address} />
 
           <Row
             label="Last Login"
@@ -583,11 +516,7 @@ export default function UserDetails() {
         </div>
       </div>
 
-      {/* =================================================
-          MANAGERS CREATED BY THIS ADMIN
-          (ADMIN DETAILS CONTEXT ONLY)
-      ================================================= */}
-
+      {/* MANAGERS CREATED BY THIS ADMIN */}
       {!isManagerContext && (
         <div className="mt-8">
           <div className="mb-3 flex items-center gap-2">
@@ -629,10 +558,7 @@ export default function UserDetails() {
         </div>
       )}
 
-      {/* =================================================
-          DELETE CONFIRMATION
-      ================================================= */}
-
+      {/* DELETE CONFIRMATION */}
       <ConfirmModal
         open={deleting}
         onClose={() => setDeleting(false)}

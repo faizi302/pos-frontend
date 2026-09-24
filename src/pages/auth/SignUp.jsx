@@ -21,7 +21,6 @@ import {
   useGetPublicBusinessTypesByBusinessQuery,
 } from "../../features/businessTypes/businessTypesApi";
 
-
 const emptyForm = {
   name: "",
   email: "",
@@ -35,9 +34,7 @@ const emptyForm = {
   businessType: "",
 };
 
-
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -57,7 +54,6 @@ const Signup = () => {
 
   const [signup, { isLoading: isSigningUp }] = useSignupMutation();
 
-
   // =====================================================
   // PUBLIC BUSINESSES
   // =====================================================
@@ -67,7 +63,6 @@ const Signup = () => {
     isLoading: isLoadingBusinesses,
     isError: isBusinessError,
   } = useGetPublicBusinessesQuery();
-
 
   // =====================================================
   // PUBLIC BUSINESS TYPES
@@ -82,7 +77,6 @@ const Signup = () => {
     skip: !form.business,
   });
 
-
   // =====================================================
   // ERROR HANDLING
   // =====================================================
@@ -93,13 +87,11 @@ const Signup = () => {
     }
   }, [isBusinessError]);
 
-
   useEffect(() => {
     if (isBusinessTypeError) {
       toast.error("Unable to load business types");
     }
   }, [isBusinessTypeError]);
-
 
   // =====================================================
   // OPTIONS
@@ -112,14 +104,12 @@ const Signup = () => {
       label: business.name,
     }));
 
-
   const businessTypeOptions = businessTypes
     .filter((businessType) => businessType.isActive !== false)
     .map((businessType) => ({
       value: businessType._id,
       label: businessType.name,
     }));
-
 
   // =====================================================
   // HANDLE INPUT CHANGE
@@ -153,7 +143,6 @@ const Signup = () => {
     }));
   };
 
-
   // =====================================================
   // AVATAR
   // =====================================================
@@ -178,14 +167,12 @@ const Signup = () => {
     setAvatarPreview(URL.createObjectURL(file));
   };
 
-
   const handleRemoveAvatar = () => {
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     setAvatar(null);
     setAvatarPreview("");
     if (avatarInputRef.current) avatarInputRef.current.value = "";
   };
-
 
   // =====================================================
   // LOGO (Business Logo)
@@ -211,14 +198,12 @@ const Signup = () => {
     setLogoPreview(URL.createObjectURL(file));
   };
 
-
   const handleRemoveLogo = () => {
     if (logoPreview) URL.revokeObjectURL(logoPreview);
     setLogo(null);
     setLogoPreview("");
     if (logoInputRef.current) logoInputRef.current.value = "";
   };
-
 
   // =====================================================
   // VALIDATION
@@ -227,23 +212,37 @@ const Signup = () => {
   const validateForm = () => {
     const newErrors = {};
 
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const phone = form.phone.trim();
+    const country = form.country.trim();
+    const city = form.city.trim();
+    const address = form.address.trim();
+
     // Name (required)
-    if (!form.name.trim()) {
-      newErrors.name = "Name is required";
-    } else if (form.name.trim().length < 2) {
-      newErrors.name = "Name must be at least 2 characters";
+    if (!name) {
+      newErrors.name = "Full name is required";
+    } else if (name.length < 2) {
+      newErrors.name = "Full name must be at least 2 characters";
+    } else if (name.length > 100) {
+      newErrors.name = "Full name cannot exceed 100 characters";
     }
 
     // Email (required)
-    if (!form.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!emailRegex.test(form.email.trim())) {
-      newErrors.email = "Please enter a valid email";
+    if (!email) {
+      newErrors.email = "Email address is required";
+    } else if (!emailRegex.test(email)) {
+      newErrors.email = "Please enter a valid email address";
     }
 
-    // Phone (optional – only validate format if provided)
-    if (form.phone.trim() && form.phone.trim().length < 10) {
-      newErrors.phone = "Please enter a valid phone number";
+    // Phone (optional)
+    if (phone) {
+      if (phone.length < 10) {
+        newErrors.phone =
+          "Please enter a valid phone number (at least 10 digits)";
+      } else if (phone.length > 30) {
+        newErrors.phone = "Phone number cannot exceed 30 characters";
+      }
     }
 
     // Password (required)
@@ -251,20 +250,40 @@ const Signup = () => {
       newErrors.password = "Password is required";
     } else if (form.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters";
+    } else if (form.password.length > 100) {
+      newErrors.password = "Password cannot exceed 100 characters";
     }
 
     // Confirm Password (required)
     if (!form.confirmPassword) {
-      newErrors.confirmPassword = "Confirm password is required";
+      newErrors.confirmPassword = "Please confirm your password";
     } else if (form.password !== form.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
     }
 
-    // Country / City / Address – optional (no required check)
+    // Country / City / Address (optional length checks)
+    if (country.length > 100) {
+      newErrors.country = "Country cannot exceed 100 characters";
+    }
+    if (city.length > 100) {
+      newErrors.city = "City cannot exceed 100 characters";
+    }
+    if (address.length > 500) {
+      newErrors.address = "Address cannot exceed 500 characters";
+    }
+
+    // Business (required on frontend only)
+    if (!form.business) {
+      newErrors.business = "Please select a business";
+    }
+
+    // Business Type (required on frontend only)
+    if (!form.businessType) {
+      newErrors.businessType = "Please select a business type";
+    }
 
     setErrors(newErrors);
 
-    // Show the first error in toast
     const firstError = Object.values(newErrors)[0];
     if (firstError) {
       toast.error(firstError);
@@ -272,7 +291,6 @@ const Signup = () => {
 
     return Object.keys(newErrors).length === 0;
   };
-
 
   // =====================================================
   // SUBMIT
@@ -307,13 +325,9 @@ const Signup = () => {
         formData.append("address", form.address.trim());
       }
 
-      if (form.business) {
-        formData.append("business", form.business);
-      }
-
-      if (form.businessType) {
-        formData.append("businessType", form.businessType);
-      }
+      // Always send (validated as required on frontend)
+      formData.append("business", form.business);
+      formData.append("businessType", form.businessType);
 
       if (avatar) {
         formData.append("avatar", avatar);
@@ -341,12 +355,9 @@ const Signup = () => {
     }
   };
 
-
   return (
     <div className="w-full min-h-screen bg-surface flex items-center justify-center">
-
       <div className="w-full">
-
         {/* =====================================================
             HEADER
         ===================================================== */}
@@ -368,25 +379,21 @@ const Signup = () => {
           </div>
         </div>
 
-
         {/* =====================================================
             SCROLLABLE FORM
         ===================================================== */}
 
         <div className="w-full max-h-[calc(100vh-150px)] overflow-y-auto">
-
           <form
             onSubmit={handleSubmit}
             className="w-full space-y-6 pt-6"
             noValidate
           >
-
             {/* =====================================================
                 PROFILE PICTURE + BUSINESS LOGO
             ===================================================== */}
 
             <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6">
-
               {/* Avatar */}
               <div className="w-full">
                 <label className="block text-sm font-medium text-primary mb-3">
@@ -433,6 +440,7 @@ const Signup = () => {
                       type="button"
                       variant="secondary"
                       onClick={() => avatarInputRef.current?.click()}
+                      disabled={isSigningUp}
                     >
                       <Upload className="w-4 h-4 mr-2" />
                       Upload Image
@@ -444,7 +452,6 @@ const Signup = () => {
                   </div>
                 </div>
               </div>
-
 
               {/* Logo */}
               <div className="w-full">
@@ -492,6 +499,7 @@ const Signup = () => {
                       type="button"
                       variant="secondary"
                       onClick={() => logoInputRef.current?.click()}
+                      disabled={isSigningUp}
                     >
                       <Upload className="w-4 h-4 mr-2" />
                       Upload Logo
@@ -503,9 +511,7 @@ const Signup = () => {
                   </div>
                 </div>
               </div>
-
             </div>
-
 
             {/* =====================================================
                 PERSONAL INFORMATION
@@ -517,19 +523,19 @@ const Signup = () => {
               </h2>
 
               <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-
                 <Input
-                  label="Full Name"
+                  label="Full Name *"
                   name="name"
                   value={form.name}
                   onChange={handleChange}
                   placeholder="Enter your full name"
                   error={errors.name}
                   required
+                  disabled={isSigningUp}
                 />
 
                 <Input
-                  label="Email"
+                  label="Email *"
                   name="email"
                   type="email"
                   value={form.email}
@@ -537,6 +543,7 @@ const Signup = () => {
                   placeholder="Enter your email"
                   error={errors.email}
                   required
+                  disabled={isSigningUp}
                 />
 
                 <Input
@@ -544,33 +551,34 @@ const Signup = () => {
                   name="phone"
                   value={form.phone}
                   onChange={handleChange}
-                  placeholder="03XX XXXXXXX"
+                  placeholder="Enter your phone number"
                   error={errors.phone}
+                  disabled={isSigningUp}
                 />
 
                 <PasswordInput
-                  label="Password"
+                  label="Password *"
                   name="password"
                   value={form.password}
                   onChange={handleChange}
-                  placeholder="Enter password"
+                  placeholder="Enter your password"
                   error={errors.password}
                   required
+                  disabled={isSigningUp}
                 />
 
                 <PasswordInput
-                  label="Confirm Password"
+                  label="Confirm Password *"
                   name="confirmPassword"
                   value={form.confirmPassword}
                   onChange={handleChange}
-                  placeholder="Re-enter password"
+                  placeholder="Confirm your password"
                   error={errors.confirmPassword}
                   required
+                  disabled={isSigningUp}
                 />
-
               </div>
             </div>
-
 
             {/* =====================================================
                 ADDRESS INFORMATION
@@ -585,14 +593,14 @@ const Signup = () => {
               </h2>
 
               <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-
                 <Input
                   label="Country"
                   name="country"
                   value={form.country}
                   onChange={handleChange}
-                  placeholder="e.g. Pakistan"
+                  placeholder="Enter your country"
                   error={errors.country}
+                  disabled={isSigningUp}
                 />
 
                 <Input
@@ -600,8 +608,9 @@ const Signup = () => {
                   name="city"
                   value={form.city}
                   onChange={handleChange}
-                  placeholder="e.g. Lahore"
+                  placeholder="Enter your city"
                   error={errors.city}
+                  disabled={isSigningUp}
                 />
 
                 <div className="md:col-span-2">
@@ -610,14 +619,13 @@ const Signup = () => {
                     name="address"
                     value={form.address}
                     onChange={handleChange}
-                    placeholder="Enter full address"
+                    placeholder="Enter your full address"
                     error={errors.address}
+                    disabled={isSigningUp}
                   />
                 </div>
-
               </div>
             </div>
-
 
             {/* =====================================================
                 ACCOUNT & BUSINESS
@@ -629,7 +637,6 @@ const Signup = () => {
               </h2>
 
               <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-
                 {/* Role (read-only) */}
                 <div className="w-full">
                   <label className="block text-sm font-medium text-primary mb-2">
@@ -643,10 +650,10 @@ const Signup = () => {
                   </p>
                 </div>
 
-                {/* Business (optional) */}
+                {/* Business (required on frontend) */}
                 <div className="w-full">
                   <Select
-                    label="Business"
+                    label="Business *"
                     name="business"
                     value={form.business}
                     onChange={handleChange}
@@ -654,29 +661,30 @@ const Signup = () => {
                     placeholder={
                       isLoadingBusinesses
                         ? "Loading businesses..."
-                        : "Select business (optional)"
+                        : "Select your business"
                     }
                     disabled={isLoadingBusinesses || isSigningUp}
                     error={errors.business}
+                    required
                   />
                 </div>
 
-                {/* Business Type (optional) */}
+                {/* Business Type (required on frontend) */}
                 <div className="w-full md:col-span-2">
                   <Select
-                    label="Business Type"
+                    label="Business Type *"
                     name="businessType"
                     value={form.businessType}
                     onChange={handleChange}
                     options={businessTypeOptions}
                     placeholder={
                       !form.business
-                        ? "Select business first"
+                        ? "Select a business first"
                         : isLoadingBusinessTypes || isFetchingBusinessTypes
                         ? "Loading business types..."
                         : businessTypeOptions.length === 0
                         ? "No business types available"
-                        : "Select business type (optional)"
+                        : "Select your business type"
                     }
                     disabled={
                       !form.business ||
@@ -685,6 +693,7 @@ const Signup = () => {
                       isSigningUp
                     }
                     error={errors.businessType}
+                    required
                   />
 
                   {form.business && businessTypeOptions.length > 0 && (
@@ -694,10 +703,8 @@ const Signup = () => {
                     </p>
                   )}
                 </div>
-
               </div>
             </div>
-
 
             {/* =====================================================
                 ACCOUNT INFO NOTE
@@ -706,11 +713,12 @@ const Signup = () => {
             <div className="w-full rounded-xl border border-primary bg-surface px-4 py-3">
               <p className="text-sm text-secondary leading-6">
                 Your account will be registered with the{" "}
-                <strong>Admin</strong> role. The account will remain{" "}
-                <strong>pending</strong> until it is approved by Super Admin.
+                <strong className="text-primary">Admin</strong> role. The
+                account will remain{" "}
+                <strong className="text-primary">pending</strong> until it is
+                approved by Super Admin.
               </p>
             </div>
-
 
             {/* =====================================================
                 SUBMIT
@@ -726,7 +734,6 @@ const Signup = () => {
               </Button>
             </div>
 
-
             {/* =====================================================
                 LOGIN LINK
             ===================================================== */}
@@ -738,21 +745,17 @@ const Signup = () => {
                   type="button"
                   onClick={() => navigate("/login")}
                   className="text-brand font-medium hover:underline"
+                  disabled={isSigningUp}
                 >
                   Login
                 </button>
               </p>
             </div>
-
           </form>
-
         </div>
-
       </div>
-
     </div>
   );
 };
-
 
 export default Signup;

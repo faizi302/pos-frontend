@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   X,
   Upload,
@@ -23,11 +23,31 @@ import { useGetBrandsByBusinessTypeQuery } from "../../features/brands/brandsApi
 import { useGetModelsByBrandQuery } from "../../features/models/modelsApi";
 
 const PRODUCT_TYPES = [
-  { value: "simple", label: "Simple Product", description: "One product without variations" },
-  { value: "variable", label: "Variable Product", description: "Product with multiple variations" },
-  { value: "service", label: "Service", description: "A service instead of a physical product" },
-  { value: "digital", label: "Digital Product", description: "Downloadable or digital product" },
-  { value: "bundle", label: "Bundle", description: "Multiple products sold together" },
+  {
+    value: "simple",
+    label: "Simple Product",
+    description: "One product without variations",
+  },
+  {
+    value: "variable",
+    label: "Variable Product",
+    description: "Product with multiple variations",
+  },
+  {
+    value: "service",
+    label: "Service",
+    description: "A service instead of a physical product",
+  },
+  {
+    value: "digital",
+    label: "Digital Product",
+    description: "Downloadable or digital product",
+  },
+  {
+    value: "bundle",
+    label: "Bundle",
+    description: "Multiple products sold together",
+  },
 ];
 
 const UNITS = [
@@ -36,7 +56,9 @@ const UNITS = [
   "carton", "set", "hour", "day", "service", "other",
 ];
 
-const BARCODE_TYPES = ["EAN-13", "EAN-8", "UPC", "CODE128", "ISBN", "QR", "CUSTOM"];
+const BARCODE_TYPES = [
+  "EAN-13", "EAN-8", "UPC", "CODE128", "ISBN", "QR", "CUSTOM",
+];
 
 const getId = (value) => {
   if (!value) return "";
@@ -51,6 +73,19 @@ const normalizeArray = (data, keys = []) => {
   }
   if (Array.isArray(data?.data)) return data.data;
   return [];
+};
+
+const isMobileBusinessType = (businessType) => {
+  if (!businessType) return false;
+
+  const name =
+    typeof businessType === "string"
+      ? businessType
+      : businessType?.name || businessType?.title || "";
+
+  return ["mobile", "mobiles"].includes(
+    String(name).toLowerCase().trim()
+  );
 };
 
 const defaultForm = {
@@ -88,11 +123,15 @@ const ProductForm = ({
 
   const userBusinessId = getId(authUser?.business);
   const userBusinessTypeId = getId(authUser?.businessType);
+  const userBusinessType = authUser?.businessType;
+
+  const showTrackSerial = isMobileBusinessType(userBusinessType);
 
   const [form, setForm] = useState(defaultForm);
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
-  const [removeImages, setRemoveImages] = useState([]); // publicIds to remove on update
+  const [removeImages, setRemoveImages] = useState([]);
+  const nameManuallyEdited = useRef(false);
 
   const { data: categoriesData, isLoading: categoriesLoading } =
     useGetCategoriesQuery(
@@ -121,13 +160,14 @@ const ProductForm = ({
     [modelsData]
   );
 
-  // Initialize form
+  // Initialize form (edit mode)
   useEffect(() => {
     if (!initialValues) {
       setForm(defaultForm);
       setImageFiles([]);
       setImagePreviews([]);
       setRemoveImages([]);
+      nameManuallyEdited.current = false;
       return;
     }
 
@@ -141,10 +181,10 @@ const ProductForm = ({
       shortDescription: initialValues?.shortDescription || "",
       description: initialValues?.description || "",
       productType: initialValues?.productType || "simple",
-      hasVariants: initialValues?.hasVariants || false,
-      trackSerial: initialValues?.trackSerial || false,
+      hasVariants: Boolean(initialValues?.hasVariants),
+      trackSerial: Boolean(initialValues?.trackSerial),
       unit: initialValues?.unit || "piece",
-      isFeatured: initialValues?.isFeatured || false,
+      isFeatured: Boolean(initialValues?.isFeatured),
       isActive: initialValues?.isActive ?? true,
     });
 
@@ -161,10 +201,38 @@ const ProductForm = ({
     setImagePreviews(existing);
     setImageFiles([]);
     setRemoveImages([]);
+    nameManuallyEdited.current = true; // don't overwrite existing name
   }, [initialValues]);
+
+  // Auto-generate product name from Brand + Model
+  useEffect(() => {
+    if (isEditMode || nameManuallyEdited.current) return;
+
+    const selectedBrand = brands.find((b) => getId(b) === form.brand);
+    const selectedModel = models.find((m) => getId(m) === form.model);
+
+    const brandName = selectedBrand?.name?.trim() || "";
+    const modelName = selectedModel?.name?.trim() || "";
+
+    let autoName = "";
+    if (brandName && modelName) {
+      autoName = `${brandName} ${modelName}`;
+    } else if (brandName) {
+      autoName = brandName;
+    }
+
+    if (autoName) {
+      setForm((prev) => ({ ...prev, name: autoName }));
+    }
+  }, [form.brand, form.model, brands, models, isEditMode]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    if (name === "name") {
+      nameManuallyEdited.current = true;
+    }
+
     setForm((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
@@ -172,10 +240,19 @@ const ProductForm = ({
   };
 
   const handleBrandChange = (e) => {
+    nameManuallyEdited.current = false;
     setForm((prev) => ({
       ...prev,
       brand: e.target.value,
       model: "",
+    }));
+  };
+
+  const handleModelChange = (e) => {
+    nameManuallyEdited.current = false;
+    setForm((prev) => ({
+      ...prev,
+      model: e.target.value,
     }));
   };
 
@@ -205,7 +282,9 @@ const ProductForm = ({
     const selectedFiles = Array.from(e.target.files || []);
     if (!selectedFiles.length) return;
 
-    const total = imageFiles.length + imagePreviews.filter((i) => i.type === "existing").length;
+    const existingCount = imagePreviews.filter((i) => i.type === "existing").length;
+    const total = existingCount + imageFiles.length;
+
     if (total + selectedFiles.length > 10) {
       toast.error("You can upload a maximum of 10 images.");
       e.target.value = "";
@@ -231,11 +310,13 @@ const ProductForm = ({
     }
 
     setImageFiles((prev) => [...prev, ...validFiles]);
+
     const newPreviews = validFiles.map((file) => ({
       type: "new",
       url: URL.createObjectURL(file),
       file,
     }));
+
     setImagePreviews((prev) => [...prev, ...newPreviews]);
     e.target.value = "";
   };
@@ -273,6 +354,10 @@ const ProductForm = ({
       toast.error("Variable products must have variants enabled");
       return false;
     }
+    if (form.productType === "simple" && form.hasVariants) {
+      toast.error("A simple product cannot have variants");
+      return false;
+    }
     return true;
   };
 
@@ -287,26 +372,36 @@ const ProductForm = ({
 
     const formData = new FormData();
 
-    // Only editable fields — never sku / slug / business / businessType
     formData.append("category", form.category);
     formData.append("brand", form.brand);
     formData.append("name", form.name.trim());
 
-    if (form.model) formData.append("model", form.model);
-    if (form.barcode.trim()) formData.append("barcode", form.barcode.trim());
-    formData.append("barcodeType", form.barcode.trim() ? form.barcodeType : "CUSTOM");
+    if (form.model) {
+      formData.append("model", form.model);
+    }
+
+    if (form.barcode.trim()) {
+      formData.append("barcode", form.barcode.trim());
+      formData.append("barcodeType", form.barcodeType || "CUSTOM");
+    }
 
     formData.append("shortDescription", form.shortDescription.trim());
     formData.append("description", form.description.trim());
     formData.append("productType", form.productType);
     formData.append("hasVariants", String(form.hasVariants));
-    formData.append("trackSerial", String(form.trackSerial));
     formData.append("unit", form.unit);
     formData.append("isFeatured", String(form.isFeatured));
     formData.append("isActive", String(form.isActive));
 
+    // Only send trackSerial when business type is mobiles
+    if (showTrackSerial) {
+      formData.append("trackSerial", String(form.trackSerial));
+    }
+
     // New images
-    imageFiles.forEach((file) => formData.append("images", file));
+    imageFiles.forEach((file) => {
+      formData.append("images", file);
+    });
 
     // Images to remove (update only)
     if (isEditMode && removeImages.length > 0) {
@@ -325,10 +420,14 @@ const ProductForm = ({
   const textareaClass =
     "min-h-[110px] w-full rounded-xl border border-primary bg-surface px-4 py-3 text-sm text-primary outline-none transition focus:border-brand";
   const labelClass = "mb-2 block text-sm font-medium text-primary";
-  const sectionClass = "overflow-hidden rounded-2xl border border-primary bg-card shadow-sm";
+  const sectionClass =
+    "overflow-hidden rounded-2xl border border-primary bg-card shadow-sm";
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-5xl space-y-6 pb-10">
+    <form
+      onSubmit={handleSubmit}
+      className="mx-auto w-full max-w-5xl space-y-6 pb-10"
+    >
       {/* Header */}
       <div className="rounded-2xl border border-primary bg-card p-5 shadow-sm sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -341,7 +440,7 @@ const ProductForm = ({
                 {isEditMode ? "Update Product" : "Create New Product"}
               </h1>
               <p className="mt-1 text-sm text-secondary">
-                Fill in product details. SKU & slug are generated automatically by the system.
+                Fill in product details. SKU and slug are generated automatically.
               </p>
             </div>
           </div>
@@ -361,7 +460,9 @@ const ProductForm = ({
             </div>
             <div>
               <h2 className="font-semibold text-primary">Catalog</h2>
-              <p className="text-xs text-secondary">Category, Brand and Model</p>
+              <p className="text-xs text-secondary">
+                Category, Brand and Model
+              </p>
             </div>
           </div>
         </div>
@@ -378,7 +479,7 @@ const ProductForm = ({
               className={inputClass}
               disabled={categoriesLoading}
             >
-              <option value="">Select Category</option>
+              <option value="">Select category</option>
               {categories.map((cat) => (
                 <option key={getId(cat)} value={getId(cat)}>
                   {cat.name}
@@ -398,7 +499,7 @@ const ProductForm = ({
               className={inputClass}
               disabled={brandsLoading}
             >
-              <option value="">Select Brand</option>
+              <option value="">Select brand</option>
               {brands.map((brand) => (
                 <option key={getId(brand)} value={getId(brand)}>
                   {brand.name}
@@ -412,11 +513,11 @@ const ProductForm = ({
             <select
               name="model"
               value={form.model}
-              onChange={handleChange}
+              onChange={handleModelChange}
               className={inputClass}
               disabled={!form.brand || modelsLoading}
             >
-              <option value="">Select Model</option>
+              <option value="">Select model (optional)</option>
               {models.map((model) => (
                 <option key={getId(model)} value={getId(model)}>
                   {model.name}
@@ -436,7 +537,9 @@ const ProductForm = ({
             </div>
             <div>
               <h2 className="font-semibold text-primary">Product Name</h2>
-              <p className="text-xs text-secondary">Enter the product name (Title Case recommended)</p>
+              <p className="text-xs text-secondary">
+                Auto-filled from Brand + Model (you can edit it)
+              </p>
             </div>
           </div>
         </div>
@@ -450,7 +553,7 @@ const ProductForm = ({
             name="name"
             value={form.name}
             onChange={handleChange}
-            placeholder="e.g. Samsung Galaxy S20"
+            placeholder="Product Name"
             className={inputClass}
           />
         </div>
@@ -465,20 +568,22 @@ const ProductForm = ({
             </div>
             <div>
               <h2 className="font-semibold text-primary">Identification</h2>
-              <p className="text-xs text-secondary">Barcode only (SKU & slug are auto-generated)</p>
+              <p className="text-xs text-secondary">
+                Barcode only (SKU & slug are generated by the system)
+              </p>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2 sm:p-6">
           <div>
-            <label className={labelClass}>Barcode (Optional)</label>
+            <label className={labelClass}>Barcode</label>
             <input
               type="text"
               name="barcode"
               value={form.barcode}
               onChange={handleChange}
-              placeholder="Enter barcode"
+              placeholder="Barcode should be Unique"
               className={inputClass}
             />
           </div>
@@ -511,7 +616,9 @@ const ProductForm = ({
             </div>
             <div>
               <h2 className="font-semibold text-primary">Configuration</h2>
-              <p className="text-xs text-secondary">Product type, unit and serial tracking</p>
+              <p className="text-xs text-secondary">
+                Product type, unit and options
+              </p>
             </div>
           </div>
         </div>
@@ -545,11 +652,17 @@ const ProductForm = ({
                           isSelected ? "border-brand" : "border-secondary"
                         }`}
                       >
-                        {isSelected && <div className="h-2 w-2 rounded-full bg-brand" />}
+                        {isSelected && (
+                          <div className="h-2 w-2 rounded-full bg-brand" />
+                        )}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-primary">{type.label}</p>
-                        <p className="mt-1 text-xs text-secondary">{type.description}</p>
+                        <p className="text-sm font-semibold text-primary">
+                          {type.label}
+                        </p>
+                        <p className="mt-1 text-xs text-secondary">
+                          {type.description}
+                        </p>
                       </div>
                     </div>
                   </label>
@@ -560,7 +673,12 @@ const ProductForm = ({
 
           <div className="max-w-xs">
             <label className={labelClass}>Selling Unit</label>
-            <select name="unit" value={form.unit} onChange={handleChange} className={inputClass}>
+            <select
+              name="unit"
+              value={form.unit}
+              onChange={handleChange}
+              className={inputClass}
+            >
               {UNITS.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit.charAt(0).toUpperCase() + unit.slice(1)}
@@ -589,24 +707,27 @@ const ProductForm = ({
               </div>
             </label>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-primary p-4 transition hover:bg-surface">
-              <input
-                type="checkbox"
-                name="trackSerial"
-                checked={form.trackSerial}
-                onChange={handleChange}
-                className="mt-1 h-4 w-4 rounded"
-              />
-              <div>
-                <p className="flex items-center gap-2 text-sm font-semibold text-primary">
-                  <Smartphone size={16} />
-                  Track Serial / IMEI
-                </p>
-                <p className="mt-1 text-xs text-secondary">
-                  Enable for mobiles and high-value items
-                </p>
-              </div>
-            </label>
+            {/* Only show IMEI / Serial tracking for Mobile business type */}
+            {showTrackSerial && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-primary p-4 transition hover:bg-surface">
+                <input
+                  type="checkbox"
+                  name="trackSerial"
+                  checked={form.trackSerial}
+                  onChange={handleChange}
+                  className="mt-1 h-4 w-4 rounded"
+                />
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+                    <Smartphone size={16} />
+                    Track Serial / IMEI
+                  </p>
+                  <p className="mt-1 text-xs text-secondary">
+                    Enable for mobiles and high-value items
+                  </p>
+                </div>
+              </label>
+            )}
           </div>
         </div>
       </section>
@@ -626,23 +747,10 @@ const ProductForm = ({
         </div>
 
         <div className="space-y-5 p-5 sm:p-6">
-          <div>
-            <label className={labelClass}>Short Description</label>
-            <textarea
-              name="shortDescription"
-              value={form.shortDescription}
-              onChange={handleChange}
-              maxLength={500}
-              placeholder="Write a short description..."
-              className={textareaClass}
-            />
-            <div className="mt-1 text-right text-xs text-secondary">
-              {form.shortDescription.length}/500
-            </div>
-          </div>
+
 
           <div>
-            <label className={labelClass}>Full Description</label>
+            <label className={labelClass}>Description</label>
             <textarea
               name="description"
               value={form.description}
@@ -663,7 +771,9 @@ const ProductForm = ({
             </div>
             <div>
               <h2 className="font-semibold text-primary">Product Images</h2>
-              <p className="text-xs text-secondary">Upload up to 10 images (max 5MB each)</p>
+              <p className="text-xs text-secondary">
+                Upload up to 10 images (max 5MB each)
+              </p>
             </div>
           </div>
         </div>
@@ -671,12 +781,17 @@ const ProductForm = ({
         <div className="p-5 sm:p-6">
           <label className="group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-primary p-8 text-center transition hover:border-brand/40 hover:bg-brand/5">
             <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-surface transition group-hover:bg-brand/10">
-              <Upload size={28} className="text-secondary transition group-hover:text-brand" />
+              <Upload
+                size={28}
+                className="text-secondary transition group-hover:text-brand"
+              />
             </div>
             <p className="mt-4 text-sm font-semibold text-primary">
               Click to upload product images
             </p>
-            <p className="mt-1 text-xs text-secondary">PNG, JPG, JPEG or WEBP</p>
+            <p className="mt-1 text-xs text-secondary">
+              PNG, JPG, JPEG or WEBP
+            </p>
             <input
               type="file"
               accept="image/*"
@@ -741,7 +856,9 @@ const ProductForm = ({
               className="mt-1 h-4 w-4 rounded"
             />
             <div>
-              <p className="text-sm font-semibold text-primary">Active Product</p>
+              <p className="text-sm font-semibold text-primary">
+                Active Product
+              </p>
               <p className="mt-1 text-xs text-secondary">
                 Product will be available in the catalog
               </p>
@@ -757,7 +874,9 @@ const ProductForm = ({
               className="mt-1 h-4 w-4 rounded"
             />
             <div>
-              <p className="text-sm font-semibold text-primary">Featured Product</p>
+              <p className="text-sm font-semibold text-primary">
+                Featured Product
+              </p>
               <p className="mt-1 text-xs text-secondary">
                 Highlight this product in featured areas
               </p>
