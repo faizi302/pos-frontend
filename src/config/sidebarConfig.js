@@ -109,7 +109,7 @@ export const sidebarConfig = [
     path: "/models",
     icon: Boxes,
     section: "Business Setup",
-    roles: ["admin" , "manager"],
+    roles: ["admin" ],
     comingSoon: false,
   },
 
